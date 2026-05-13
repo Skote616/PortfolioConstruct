@@ -1,0 +1,186 @@
+@page "/"
+@inject NavigationManager Navigation
+@inject DBService DbService
+@inject SessionService Session
+@using PortfolioConstruct.Models
+@using PortfolioConstruct.Service
+@attribute [Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryToken]
+@rendermode InteractiveServer
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <h2 class="login-title">Portfolio<span class="accent">Construct</span></h2>
+        <p class="login-sub">Конструктор студенческого портфолио</p>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert-error">@errorMessage</div>
+        }
+
+        <div class="field-group">
+            <label>Email</label>
+            <input type="email" @bind="email" @bind:event="oninput" placeholder="student@example.com" class="field-input" />
+        </div>
+
+        <div class="field-group">
+            <label>Пароль</label>
+            <input type="password" @bind="password" @bind:event="oninput" placeholder="••••••••" class="field-input" />
+        </div>
+
+        <button class="btn-primary" @onclick="Enter" disabled="@isLoading">
+            @if (isLoading) { <span>Загрузка...</span> } else { <span>Войти</span> }
+        </button>
+
+        <div class="divider">или</div>
+
+        <button class="btn-secondary" @onclick="Register" disabled="@isLoading">
+            Зарегистрироваться
+        </button>
+    </div>
+</div>
+
+<style>
+    .login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f0f4f8;
+    }
+    .login-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .login-title { font-size: 1.8rem; font-weight: 700; margin: 0; color: #1a1a2e; }
+    .accent { color: #4f6ef7; }
+    .login-sub { color: #6b7280; font-size: 0.9rem; margin: 0; }
+    .field-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .field-group label { font-size: 0.85rem; font-weight: 600; color: #374151; }
+    .field-input {
+        padding: 0.65rem 1rem;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .field-input:focus { border-color: #4f6ef7; }
+    .btn-primary {
+        background: #4f6ef7;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #3b57e0; }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-secondary {
+        background: white;
+        color: #4f6ef7;
+        border: 1.5px solid #4f6ef7;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-secondary:hover:not(:disabled) { background: #f0f3ff; }
+    .btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .divider {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.85rem;
+        position: relative;
+    }
+    .alert-error {
+        background: #fef2f2;
+        border: 1px solid #fca5a5;
+        color: #b91c1c;
+        border-radius: 8px;
+        padding: 0.65rem 1rem;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    string email = string.Empty;
+    string password = string.Empty;
+    string errorMessage = string.Empty;
+    bool isLoading = false;
+
+    private async Task Enter()
+    {
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Введите email и пароль.";
+            return;
+        }
+
+        isLoading = true;
+        await Task.Yield(); // даём Blazor перерисовать кнопку
+
+        var user = DbService.Login(email, password);
+
+        if (user != null)
+        {
+            Session.Login(user);
+            Navigation.NavigateTo("/constructor");
+        }
+        else
+        {
+            errorMessage = "Неверный email или пароль.";
+        }
+
+        isLoading = false;
+    }
+
+    private async Task Register()
+    {
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "Введите email и пароль.";
+            return;
+        }
+
+        if (password.Length < 6)
+        {
+            errorMessage = "Пароль должен быть не менее 6 символов.";
+            return;
+        }
+
+        isLoading = true;
+        await Task.Yield();
+
+        bool success = DbService.Register(email, password);
+
+        if (success)
+        {
+            // После регистрации сразу входим
+            var user = DbService.Login(email, password);
+            Session.Login(user!);
+            Navigation.NavigateTo("/constructor");
+        }
+        else
+        {
+            errorMessage = "Пользователь с таким email уже существует.";
+        }
+
+        isLoading = false;
+    }
+}

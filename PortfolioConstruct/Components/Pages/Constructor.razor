@@ -1,0 +1,483 @@
+@page "/constructor"
+@inject NavigationManager Navigation
+@inject DBService DbService
+@inject SessionService Session
+@using PortfolioConstruct.Models
+@using PortfolioConstruct.Service
+@using Microsoft.AspNetCore.Components.Forms
+@rendermode InteractiveServer
+
+@if (!initialized)
+{
+    <p style="padding:2rem;color:#9ca3af">Загрузка...</p>
+}
+else
+{
+<div class="constructor-layout">
+
+    <!-- Боковая панель -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span class="logo">Portfolio<b>Construct</b></span>
+            <span class="user-email">@Session.CurrentUserEmail</span>
+        </div>
+
+        <nav class="section-nav">
+            @if (portfolio != null)
+            {
+                @foreach (var sec in portfolio.Sections)
+                {
+                    <div class="nav-item @(activeSection?.Id == sec.Id ? "active" : "")"
+                         @onclick="() => SelectSection(sec)">
+                        <span>@sec.Title</span>
+                        @if (sec.IsCustom)
+                        {
+                            <button class="btn-icon danger" @onclick:stopPropagation="true"
+                                    @onclick="() => DeleteSection(sec)">✕</button>
+                        }
+                    </div>
+                }
+            }
+        </nav>
+
+        <div class="add-section">
+            @if (addingSectionMode)
+            {
+                <input @bind="newSectionTitle" placeholder="Название раздела" class="field-input small" />
+                <div class="row-btns">
+                    <button class="btn-sm primary" @onclick="ConfirmAddSection">Добавить</button>
+                    <button class="btn-sm" @onclick="() => addingSectionMode = false">Отмена</button>
+                </div>
+            }
+            else
+            {
+                <button class="btn-add-section" @onclick="() => addingSectionMode = true">+ Новый раздел</button>
+            }
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn-sm" @onclick="GoToView">👁 Просмотр</button>
+            <button class="btn-sm danger" @onclick="Logout">Выйти</button>
+        </div>
+
+        @if (design != null)
+        {
+            <div class="design-panel">
+                <p class="panel-label">Оформление</p>
+                <div class="field-group">
+                    <label>Цвет фона</label>
+                    <input type="color" @bind="design.Color" @bind:after="SaveDesign" class="color-picker" />
+                </div>
+                <div class="field-group">
+                    <label>Шрифт</label>
+                    <select @bind="design.Font" @bind:after="SaveDesign" class="field-input small">
+                        <option value="Arial">Arial</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Verdana">Verdana</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                    </select>
+                </div>
+            </div>
+        }
+    </aside>
+
+    <!-- Основная область -->
+    <main class="editor-main">
+        @if (activeSection == null)
+        {
+            <div class="empty-state">
+                <p>👈 Выберите раздел слева для редактирования</p>
+            </div>
+        }
+        else
+        {
+            <div class="section-editor">
+                <h2 class="section-title">@activeSection.Title</h2>
+
+                @foreach (var block in activeSection.Blocks)
+                {
+                    <div class="block-card">
+                        <div class="block-header">
+                            <span class="block-type-badge">@BlockTypeLabel(block.Type)</span>
+                            <button class="btn-icon danger" @onclick="() => DeleteBlock(block)">✕</button>
+                        </div>
+
+                        @if (block.Type == "text")
+                        {
+                            <textarea class="block-textarea" @bind="block.Content"
+                                      @bind:event="oninput" rows="4"></textarea>
+                        }
+                        else if (block.Type == "image")
+                        {
+                            <!-- Загрузка файла -->
+                            <InputFile OnChange="(e) => UploadImage(e, block)"
+                                       accept="image/*" class="file-input" />
+
+                            @if (!string.IsNullOrWhiteSpace(block.Content))
+                            {
+                                <img src="@block.Content" alt="preview"
+                                     style="max-width:100%;border-radius:8px;margin-top:0.5rem;" />
+                            }
+                            @if (uploadingBlockId == block.Id)
+                            {
+                                <p class="upload-hint">⏳ Загрузка...</p>
+                            }
+
+                            <!-- Подпись к фото -->
+                            <input class="field-input light" @bind="block.Caption"
+                                   placeholder="Подпись к фото (необязательно)" />
+                        }
+                        else if (block.Type == "link")
+                        {
+                            <!-- Описание ссылки -->
+                            <input class="field-input light" @bind="block.Caption"
+                                   placeholder="Описание ссылки (например: Мой GitHub)" />
+                            <input class="field-input light" @bind="block.Content"
+                                   placeholder="https://..." />
+                        }
+
+                        <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
+                    </div>
+                }
+
+                <div class="add-block-bar">
+                    <span class="panel-label">Добавить блок:</span>
+                    <button class="btn-block-type" @onclick='() => AddBlock("text")'>📝 Текст</button>
+                    <button class="btn-block-type" @onclick='() => AddBlock("image")'>🖼 Изображение</button>
+                    <button class="btn-block-type" @onclick='() => AddBlock("link")'>🔗 Ссылка</button>
+                </div>
+            </div>
+        }
+    </main>
+</div>
+}
+
+<style>
+    .constructor-layout {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    .sidebar {
+        width: 260px;
+        min-width: 260px;
+        background: #1a1a2e;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 1.25rem 1rem;
+        gap: 0.5rem;
+    }
+    .sidebar-header { margin-bottom: 1rem; }
+    .logo { font-size: 1.1rem; color: white; }
+    .logo b { color: #4f6ef7; }
+    .user-email { display: block; font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; }
+    .section-nav { display: flex; flex-direction: column; gap: 0.25rem; }
+    .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #d1d5db;
+        transition: background 0.15s;
+    }
+    .nav-item:hover { background: #2d2d4e; }
+    .nav-item.active { background: #4f6ef7; color: white; }
+    .add-section { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .btn-add-section {
+        background: none;
+        border: 1.5px dashed #4f6ef7;
+        color: #4f6ef7;
+        border-radius: 8px;
+        padding: 0.5rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background 0.15s;
+    }
+    .btn-add-section:hover { background: #2d2d4e; }
+    .sidebar-footer {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: auto;
+        padding-top: 1rem;
+        border-top: 1px solid #2d2d4e;
+    }
+    .design-panel {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #2d2d4e;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .panel-label { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+    .color-picker { width: 100%; height: 36px; border-radius: 6px; border: none; cursor: pointer; }
+    .editor-main {
+        flex: 1;
+        background: #f0f4f8;
+        overflow-y: auto;
+        padding: 2rem;
+    }
+    .empty-state {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9ca3af;
+        font-size: 1.1rem;
+    }
+    .section-editor { display: flex; flex-direction: column; gap: 1.25rem; max-width: 720px; }
+    .section-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+    .block-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .block-header { display: flex; justify-content: space-between; align-items: center; }
+    .block-type-badge {
+        background: #eef2ff;
+        color: #4f6ef7;
+        border-radius: 6px;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .block-textarea {
+        width: 100%;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.65rem;
+        font-size: 0.95rem;
+        resize: vertical;
+        outline: none;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+    .block-textarea:focus { border-color: #4f6ef7; }
+    .file-input {
+        display: block;
+        width: 100%;
+        padding: 0.5rem;
+        border: 1.5px dashed #d1d5db;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        background: #f9fafb;
+    }
+    .field-input.light {
+        padding: 0.55rem 0.75rem;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        background: white;
+        color: #374151;
+        outline: none;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .field-input.light:focus { border-color: #4f6ef7; }
+    .upload-hint { color: #6b7280; font-size: 0.85rem; margin: 0; }
+    .save-btn { align-self: flex-end; }
+    .add-block-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        background: white;
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .btn-block-type {
+        background: #f3f4f6;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.15s;
+    }
+    .btn-block-type:hover { background: #eef2ff; border-color: #4f6ef7; color: #4f6ef7; }
+    .field-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .field-group label { font-size: 0.78rem; color: #9ca3af; }
+    .field-input {
+        padding: 0.55rem 0.75rem;
+        border: 1.5px solid #2d2d4e;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        background: #16163a;
+        color: white;
+        outline: none;
+    }
+    .field-input.small { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+    select.field-input option { background: #1a1a2e; }
+    .row-btns { display: flex; gap: 0.5rem; }
+    .btn-sm {
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        border: 1px solid #2d2d4e;
+        background: #2d2d4e;
+        color: #d1d5db;
+        cursor: pointer;
+        font-size: 0.82rem;
+        transition: background 0.15s;
+    }
+    .btn-sm:hover { background: #3a3a5e; }
+    .btn-sm.primary { background: #4f6ef7; border-color: #4f6ef7; color: white; }
+    .btn-sm.primary:hover { background: #3b57e0; }
+    .btn-sm.danger { border-color: #ef4444; color: #ef4444; background: none; }
+    .btn-sm.danger:hover { background: #3d1515; }
+    .btn-icon {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 0.85rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        transition: background 0.15s;
+    }
+    .btn-icon.danger { color: #ef4444; }
+    .btn-icon.danger:hover { background: #fef2f2; }
+</style>
+
+@code {
+    Portfolio? portfolio;
+    DesignSetting? design;
+    Section? activeSection;
+
+    bool addingSectionMode = false;
+    string newSectionTitle = string.Empty;
+
+    // Следим за каким блоком идёт загрузка файла
+    int? uploadingBlockId = null;
+
+    bool initialized = false;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!Session.IsLoggedIn)
+            {
+                Navigation.NavigateTo("/");
+                return;
+            }
+            portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+            design = portfolio.DesignSetting;
+            activeSection = portfolio.Sections.FirstOrDefault();
+            initialized = true;
+            StateHasChanged(); // перерисовать с данными
+        }
+    }
+
+    void SelectSection(Section sec)
+    {
+        activeSection = sec;
+    }
+
+    // ===== Разделы =====
+
+    void ConfirmAddSection()
+    {
+        if (string.IsNullOrWhiteSpace(newSectionTitle) || portfolio == null) return;
+        DbService.AddCustomSection(portfolio.Id, newSectionTitle);
+        Reload(selectLast: true);
+        newSectionTitle = string.Empty;
+        addingSectionMode = false;
+    }
+
+    void DeleteSection(Section sec)
+    {
+        if (!sec.IsCustom) return;
+        DbService.DeleteSection(sec.Id);
+        Reload(selectLast: false);
+    }
+
+    // ===== Блоки =====
+
+    void AddBlock(string type)
+    {
+        if (activeSection == null) return;
+        DbService.AddBlock(activeSection.Id, type, string.Empty);
+        ReloadSection();
+    }
+
+    void SaveBlock(Block block)
+    {
+        DbService.UpdateBlock(block);
+    }
+
+    void DeleteBlock(Block block)
+    {
+        DbService.DeleteBlock(block.Id);
+        ReloadSection();
+    }
+
+    // Загрузка фото — async, потому что работаем с файлом
+    async Task UploadImage(InputFileChangeEventArgs e, Block block)
+    {
+        uploadingBlockId = block.Id;
+        StateHasChanged();
+
+        var file = e.File;
+        var path = await DbService.SaveImageAsync(file);
+
+        block.Content = path;
+        DbService.UpdateBlock(block);
+
+        uploadingBlockId = null;
+        ReloadSection();
+    }
+
+    // ===== Дизайн =====
+
+    void SaveDesign()
+    {
+        if (design != null)
+            DbService.UpdateDesign(design);
+    }
+
+    // ===== Навигация =====
+
+    void GoToView()   => Navigation.NavigateTo("/view");
+    void Logout()     { Session.Logout(); Navigation.NavigateTo("/"); }
+
+    // ===== Вспомогательное =====
+
+    void Reload(bool selectLast)
+    {
+        var prevId = activeSection?.Id;
+        portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+        design = portfolio.DesignSetting;
+        activeSection = selectLast
+            ? portfolio.Sections.LastOrDefault()
+            : portfolio.Sections.FirstOrDefault(s => s.Id == prevId)
+              ?? portfolio.Sections.FirstOrDefault();
+    }
+
+    void ReloadSection()
+    {
+        var prevId = activeSection?.Id;
+        portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+        design = portfolio.DesignSetting;
+        activeSection = portfolio.Sections.FirstOrDefault(s => s.Id == prevId);
+    }
+
+    string BlockTypeLabel(string type) => type switch
+    {
+        "text"  => "📝 Текст",
+        "image" => "🖼 Изображение",
+        "link"  => "🔗 Ссылка",
+        _       => type
+    };
+}

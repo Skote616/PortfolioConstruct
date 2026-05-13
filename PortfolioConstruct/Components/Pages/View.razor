@@ -1,0 +1,223 @@
+@page "/view"
+@inject NavigationManager Navigation
+@inject DBService DbService
+@inject SessionService Session
+@using PortfolioConstruct.Models
+@using PortfolioConstruct.Service
+@rendermode InteractiveServer
+
+@if (!initialized)
+{
+    <p style="padding:2rem;color:#9ca3af">Загрузка...</p>
+}
+else
+{
+    <div class="portfolio-page" style="background:@bgColor; font-family:@fontFamily">
+
+        <header class="portfolio-header" style="border-bottom: 3px solid @accentColor">
+            <div class="header-inner">
+                <h1 class="portfolio-name">@Session.CurrentUserEmail</h1>
+                <p class="portfolio-sub">Студенческое портфолио</p>
+            </div>
+            <button class="btn-back" @onclick="GoToConstructor">← Назад к редактору</button>
+        </header>
+
+        <nav class="portfolio-nav">
+            @foreach (var sec in portfolio.Sections)
+            {
+                <button class="nav-link @(activeViewSection?.Id == sec.Id ? "active" : "")"
+                        @onclick="() => SetSection(sec)">
+                    @sec.Title
+                </button>
+            }
+        </nav>
+
+        <main class="portfolio-content">
+            @if (activeViewSection == null)
+            {
+                <p class="empty-hint">Выберите раздел выше</p>
+            }
+            else
+            {
+                <h2 class="section-heading" style="color:@accentColor">@activeViewSection.Title</h2>
+
+                @if (!activeViewSection.Blocks.Any())
+                {
+                    <p class="empty-hint">Этот раздел пока пуст</p>
+                }
+                else
+                {
+                    @foreach (var block in activeViewSection.Blocks)
+                    {
+                        @if (block.Type == "text")
+                        {
+                            <div class="block-text">@block.Content</div>
+                        }
+                        else if (block.Type == "image" && !string.IsNullOrWhiteSpace(block.Content))
+                        {
+                            <div class="block-image">
+                                <img src="@block.Content" alt="Изображение" />
+                                @if (!string.IsNullOrWhiteSpace(block.Caption))
+                                {
+                                    <p class="block-caption">@block.Caption</p>
+                                }
+                            </div>
+                        }
+                        else if (block.Type == "link" && !string.IsNullOrWhiteSpace(block.Content))
+                        {
+                            <div class="block-link">
+                                @if (!string.IsNullOrWhiteSpace(block.Caption))
+                                {
+                                    <p class="link-label">@block.Caption</p>
+                                }
+                                <a href="@block.Content" target="_blank">🔗 @block.Content</a>
+                            </div>
+                        }
+                    }
+                }
+            }
+        </main>
+    </div>
+}
+
+<style>
+    .portfolio-page {
+        min-height: 100vh;
+        transition: background 0.3s, font-family 0.3s;
+    }
+    .portfolio-header {
+        padding: 2rem 3rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(6px);
+    }
+    .portfolio-name { margin: 0; font-size: 1.8rem; font-weight: 700; color: #1a1a2e; }
+    .portfolio-sub  { margin: 0.25rem 0 0; color: #6b7280; font-size: 0.95rem; }
+    .btn-back {
+        background: none;
+        border: 1.5px solid #4f6ef7;
+        color: #4f6ef7;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: background 0.15s;
+    }
+    .btn-back:hover { background: #eef2ff; }
+    .portfolio-nav {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0 2rem;
+        background: rgba(255,255,255,0.7);
+        border-bottom: 1px solid #e5e7eb;
+        flex-wrap: wrap;
+    }
+    .nav-link {
+        padding: 0.75rem 1.25rem;
+        color: #374151;
+        font-size: 0.95rem;
+        border: none;
+        border-bottom: 3px solid transparent;
+        background: none;
+        transition: all 0.15s;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .nav-link:hover  { color: #4f6ef7; }
+    .nav-link.active { color: #4f6ef7; border-bottom-color: #4f6ef7; font-weight: 600; }
+    .portfolio-content {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2.5rem 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    .section-heading {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid currentColor;
+    }
+    .block-text {
+        background: rgba(255,255,255,0.8);
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        font-size: 1rem;
+        line-height: 1.7;
+        color: #374151;
+        white-space: pre-wrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .block-image {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        background: white;
+    }
+    .block-image img { width: 100%; display: block; }
+    .block-caption {
+        padding: 0.6rem 1rem;
+        margin: 0;
+        font-size: 0.85rem;
+        color: #6b7280;
+        font-style: italic;
+        text-align: center;
+    }
+    .block-link {
+        background: rgba(255,255,255,0.8);
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .link-label {
+        margin: 0 0 0.4rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    .block-link a { color: #4f6ef7; text-decoration: none; word-break: break-all; }
+    .block-link a:hover { text-decoration: underline; }
+    .empty-hint { color: #9ca3af; font-size: 1rem; font-style: italic; }
+</style>
+
+@code {
+    Portfolio? portfolio;
+    Section? activeViewSection;
+
+    string bgColor    => portfolio?.DesignSetting?.Color  ?? "#f0f4f8";
+    string fontFamily => portfolio?.DesignSetting?.Font   ?? "Arial";
+    string accentColor => "#4f6ef7";
+
+    bool initialized = false;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!Session.IsLoggedIn)
+            {
+                Navigation.NavigateTo("/");
+                return;
+            }
+            portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+            activeViewSection = portfolio.Sections.FirstOrDefault();
+            initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    void SetSection(Section sec)
+    {
+        activeViewSection = portfolio?.Sections.FirstOrDefault(s => s.Id == sec.Id);
+    }
+
+    void GoToConstructor()
+    {
+        Navigation.NavigateTo("/constructor");
+    }
+}
