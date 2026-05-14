@@ -10,20 +10,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Отключаем проверку antiforgery-токена — мы не используем HTML <form>,
-// только Blazor @onclick. Но сам middleware оставляем — .NET 8 его требует.
+// Antiforgery обязателен в .NET 8 — убираем только проверку X-Frame заголовка
 builder.Services.AddAntiforgery(options =>
 {
     options.SuppressXFrameOptionsHeader = true;
 });
 
-// DbContext через DI
+// DbContext — Scoped, один экземпляр на подключение
 builder.Services.AddDbContext<PortfolioContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// DBService и SessionService — Scoped (один экземпляр на подключение)
+// Сервисы приложения
 builder.Services.AddScoped<DBService>();
 builder.Services.AddScoped<SessionService>();
+builder.Services.AddScoped<HtmlExportService>();
 
 var app = builder.Build();
 
@@ -35,7 +35,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseAntiforgery(); // обязателен в .NET 8, но страницы мы не помечаем [ValidateAntiForgeryToken]
+app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

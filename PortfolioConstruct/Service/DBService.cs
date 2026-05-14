@@ -141,8 +141,12 @@ namespace PortfolioConstruct.Service
 
         public void UpdateBlock(Block block)
         {
-            _context.Blocks.Update(block);
-            _context.SaveChanges();
+            // ExecuteUpdate не использует ChangeTracker — нет конфликтов с AsNoTracking
+            _context.Blocks
+                .Where(b => b.Id == block.Id)
+                .ExecuteUpdate(s => s
+                    .SetProperty(b => b.Content, block.Content)
+                    .SetProperty(b => b.Caption, block.Caption));
         }
 
         public void DeleteBlock(int blockId)
@@ -157,8 +161,11 @@ namespace PortfolioConstruct.Service
 
         public void UpdateDesign(DesignSetting settings)
         {
-            _context.DesignSettings.Update(settings);
-            _context.SaveChanges();
+            _context.DesignSettings
+                .Where(d => d.Id == settings.Id)
+                .ExecuteUpdate(s => s
+                    .SetProperty(d => d.Color, settings.Color)
+                    .SetProperty(d => d.Font, settings.Font));
         }
 
 

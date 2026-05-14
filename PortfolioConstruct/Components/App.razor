@@ -1,5 +1,5 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="ru">
 
 <head>
     <meta charset="utf-8" />
@@ -16,6 +16,21 @@
     <AntiforgeryToken />
     <Routes />
     <script src="_framework/blazor.web.js"></script>
+    <script>
+        // Скачивание файла из base64 — вызывается из C# через JS Interop
+        function downloadFile(filename, mimeType, base64) {
+            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+            const blob = new Blob([bytes], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
 </body>
 
 </html>

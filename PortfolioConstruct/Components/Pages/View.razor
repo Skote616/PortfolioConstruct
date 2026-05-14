@@ -2,6 +2,8 @@
 @inject NavigationManager Navigation
 @inject DBService DbService
 @inject SessionService Session
+@inject HtmlExportService ExportService
+@inject IJSRuntime JS
 @using PortfolioConstruct.Models
 @using PortfolioConstruct.Service
 @rendermode InteractiveServer
@@ -19,11 +21,16 @@ else
                 <h1 class="portfolio-name">@Session.CurrentUserEmail</h1>
                 <p class="portfolio-sub">Студенческое портфолио</p>
             </div>
-            <button class="btn-back" @onclick="GoToConstructor">← Назад к редактору</button>
+            <div style="display:flex;gap:0.75rem;align-items:center">
+                <button class="btn-back" @onclick="GoToConstructor">← Назад к редактору</button>
+                <button class="btn-export" @onclick="ExportHtml" disabled="@exporting">
+                    @(exporting ? "⏳ Экспорт..." : "⬇ Скачать HTML")
+                </button>
+            </div>
         </header>
 
         <nav class="portfolio-nav">
-            @foreach (var sec in portfolio.Sections)
+            @foreach (var sec in portfolio!.Sections)
             {
                 <button class="nav-link @(activeViewSection?.Id == sec.Id ? "active" : "")"
                         @onclick="() => SetSection(sec)">
@@ -83,7 +90,7 @@ else
 <style>
     .portfolio-page {
         min-height: 100vh;
-        transition: background 0.3s, font-family 0.3s;
+        transition: background 0.3s;
     }
     .portfolio-header {
         padding: 2rem 3rem;
@@ -107,6 +114,19 @@ else
         transition: background 0.15s;
     }
     .btn-back:hover { background: #eef2ff; }
+    .btn-export {
+        background: #4f6ef7;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: background 0.15s;
+    }
+    .btn-export:hover:not(:disabled) { background: #3b57e0; }
+    .btn-export:disabled { opacity: 0.6; cursor: not-allowed; }
     .portfolio-nav {
         display: flex;
         gap: 0.25rem;
@@ -188,12 +208,12 @@ else
 @code {
     Portfolio? portfolio;
     Section? activeViewSection;
-
-    string bgColor    => portfolio?.DesignSetting?.Color  ?? "#f0f4f8";
-    string fontFamily => portfolio?.DesignSetting?.Font   ?? "Arial";
-    string accentColor => "#4f6ef7";
-
     bool initialized = false;
+    bool exporting = false;
+
+    string bgColor     => portfolio?.DesignSetting?.Color ?? "#f0f4f8";
+    string fontFamily  => portfolio?.DesignSetting?.Font  ?? "Arial";
+    string accentColor => "#4f6ef7";
 
     protected override void OnAfterRender(bool firstRender)
     {
@@ -214,6 +234,19 @@ else
     void SetSection(Section sec)
     {
         activeViewSection = portfolio?.Sections.FirstOrDefault(s => s.Id == sec.Id);
+    }
+
+    async Task ExportHtml()
+    {
+        if (portfolio == null) return;
+        exporting = true;
+        StateHasChanged();
+
+        var zipBytes = ExportService.GenerateHtmlZip(portfolio, Session.CurrentUserEmail);
+        var base64 = Convert.ToBase64String(zipBytes);
+        await JS.InvokeVoidAsync("downloadFile", "portfolio.zip", "application/zip", base64);
+
+        exporting = false;
     }
 
     void GoToConstructor()

@@ -4,6 +4,7 @@
 @inject SessionService Session
 @using PortfolioConstruct.Models
 @using PortfolioConstruct.Service
+@using System.Net.Mail;
 @attribute [Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryToken]
 @rendermode InteractiveServer
 
@@ -148,6 +149,20 @@
         isLoading = false;
     }
 
+    private bool EmailCheck(string email)
+    {
+        try
+        {
+            var addr = new MailAddress(email);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        
+    }
+
     private async Task Register()
     {
         errorMessage = string.Empty;
@@ -164,6 +179,12 @@
             return;
         }
 
+        if (EmailCheck(email) == false)
+        {
+            errorMessage = "Почта неверного формата";
+            return;
+        }
+
         isLoading = true;
         await Task.Yield();
 
@@ -171,7 +192,6 @@
 
         if (success)
         {
-            // После регистрации сразу входим
             var user = DbService.Login(email, password);
             Session.Login(user!);
             Navigation.NavigateTo("/constructor");
