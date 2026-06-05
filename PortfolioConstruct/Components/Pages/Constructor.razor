@@ -15,7 +15,6 @@ else
 {
 <div class="constructor-layout">
 
-    <!-- Боковая панель -->
     <aside class="sidebar">
         <div class="sidebar-header">
             <span class="logo">Portfolio<b>Construct</b></span>
@@ -23,20 +22,17 @@ else
         </div>
 
         <nav class="section-nav">
-            @if (portfolio != null)
+            @foreach (var sec in portfolio!.Sections)
             {
-                @foreach (var sec in portfolio.Sections)
-                {
-                    <div class="nav-item @(activeSection?.Id == sec.Id ? "active" : "")"
-                         @onclick="() => SelectSection(sec)">
-                        <span>@sec.Title</span>
-                        @if (sec.IsCustom)
-                        {
-                            <button class="btn-icon danger" @onclick:stopPropagation="true"
-                                    @onclick="() => DeleteSection(sec)">✕</button>
-                        }
-                    </div>
-                }
+                <div class="nav-item @(activeSection?.Id == sec.Id ? "active" : "")"
+                     @onclick="() => SelectSection(sec)">
+                    <span>@sec.Title</span>
+                    @if (sec.IsCustom)
+                    {
+                        <button class="btn-icon danger" @onclick:stopPropagation="true"
+                                @onclick="() => DeleteSection(sec)">✕</button>
+                    }
+                </div>
             }
         </nav>
 
@@ -63,26 +59,38 @@ else
         @if (design != null)
         {
             <div class="design-panel">
-                <p class="panel-label">Оформление</p>
-                <div class="field-group">
-                    <label>Цвет фона</label>
-                    <input type="color" @bind="design.Color" @bind:after="SaveDesign" class="color-picker" />
+                <p class="panel-label">Тема оформления</p>
+                <div class="theme-grid">
+                    @foreach (var t in themes)
+                    {
+                        <button class="theme-btn @(design.Theme == t.Key ? "active" : "")"
+                                style="background:@t.Value.bg; color:@t.Value.text; border-color:@(design.Theme == t.Key ? t.Value.accent : "transparent")"
+                                @onclick="() => ApplyTheme(t.Key)">
+                            @t.Value.label
+                        </button>
+                    }
                 </div>
-                <div class="field-group">
-                    <label>Шрифт</label>
-                    <select @bind="design.Font" @bind:after="SaveDesign" class="field-input small">
-                        <option value="Arial">Arial</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="Courier New">Courier New</option>
-                        <option value="Verdana">Verdana</option>
-                        <option value="Times New Roman">Times New Roman</option>
-                    </select>
-                </div>
+
+                <p class="panel-label" style="margin-top:0.75rem">Акцентный цвет</p>
+                <input type="color" @bind="design.AccentColor" @bind:after="SaveDesign" class="color-picker" />
+
+                <p class="panel-label" style="margin-top:0.75rem">Фон страницы</p>
+                <input type="color" @bind="design.Color" @bind:after="SaveDesign" class="color-picker" />
+
+                <p class="panel-label" style="margin-top:0.75rem">Шрифт</p>
+                <select @bind="design.Font" @bind:after="SaveDesign" class="field-input small">
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                </select>
             </div>
         }
     </aside>
 
-    <!-- Основная область -->
     <main class="editor-main">
         @if (activeSection == null)
         {
@@ -105,39 +113,118 @@ else
 
                         @if (block.Type == "text")
                         {
-                            <textarea class="block-textarea" @bind="block.Content"
-                                      @bind:event="oninput" rows="4"></textarea>
+                            <div class="block-design-bar">
+                                <div class="align-btns">
+                                        <button class='@AlignClass(block, "left")'
+                                                @onclick='() => SetAlign(block, "left")'
+                                                title="По левому краю">
+                                            ↙
+                                        </button>
+
+                                        <button class='@AlignClass(block, "center")'
+                                                @onclick='() => SetAlign(block, "center")'
+                                                title="По центру">
+                                            ↔
+                                        </button>
+
+                                        <button class='@AlignClass(block, "right")'
+                                                @onclick='() => SetAlign(block, "right")'
+                                                title="По правому краю">
+                                            ↘
+                                        </button>
+                                </div>
+                                <div class="font-size-ctrl">
+                                    <button class="size-btn" @onclick="() => DecreaseFontSize(block)">A−</button>
+                                    <span class="size-val">@block.FontSize px</span>
+                                    <button class="size-btn" @onclick="() => IncreaseFontSize(block)">A+</button>
+                                </div>
+                                <div class="color-ctrl">
+                                    <label>Цвет</label>
+                                    <input type="color" value="@block.TextColor"
+                                           @onchange="(e) => SetTextColor(block, e.Value?.ToString())"
+                                           class="color-picker-sm" />
+                                </div>
+                            </div>
+                            <textarea class="block-textarea"
+                                      style="text-align:@block.TextAlign; font-size:@(block.FontSize)px; color:@block.TextColor"
+                                      @bind="block.Content" @bind:event="oninput" rows="4"></textarea>
+                            <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
                         }
                         else if (block.Type == "image")
                         {
-                            <!-- Загрузка файла -->
-                            <InputFile OnChange="(e) => UploadImage(e, block)"
-                                       accept="image/*" class="file-input" />
-
+                            <InputFile OnChange="(e) => UploadImage(e, block)" accept="image/*" class="file-input" />
                             @if (!string.IsNullOrWhiteSpace(block.Content))
                             {
-                                <img src="@block.Content" alt="preview"
-                                     style="max-width:100%;border-radius:8px;margin-top:0.5rem;" />
+                                <img src="@block.Content" alt="preview" class="img-preview" />
                             }
                             @if (uploadingBlockId == block.Id)
                             {
                                 <p class="upload-hint">⏳ Загрузка...</p>
                             }
-
-                            <!-- Подпись к фото -->
-                            <input class="field-input light" @bind="block.Caption"
-                                   placeholder="Подпись к фото (необязательно)" />
+                            <input class="field-input light" @bind="block.Caption" placeholder="Подпись к фото (необязательно)" />
+                            <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
                         }
                         else if (block.Type == "link")
                         {
-                            <!-- Описание ссылки -->
-                            <input class="field-input light" @bind="block.Caption"
-                                   placeholder="Описание ссылки (например: Мой GitHub)" />
-                            <input class="field-input light" @bind="block.Content"
-                                   placeholder="https://..." />
+                            <input class="field-input light" @bind="block.Caption" placeholder="Описание ссылки (например: Мой GitHub)" />
+                            <input class="field-input light" @bind="block.Content" placeholder="https://..." />
+                            <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
                         }
-
-                        <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
+                        else if (block.Type == "document")
+                        {
+                            @if (!string.IsNullOrWhiteSpace(block.Content))
+                            {
+                                var parts = block.Content.Split('|');
+                                var dName = parts.Length > 1 ? parts[1] : Path.GetFileName(parts[0]);
+                                <div class="doc-preview">
+                                    <span class="doc-icon">@GetDocIcon(dName)</span>
+                                    <div class="doc-info">
+                                        <span class="doc-name">@dName</span>
+                                        <span class="doc-caption">@block.Caption</span>
+                                    </div>
+                                    <button class="btn-icon danger" @onclick="() => ClearDocument(block)">✕</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <InputFile OnChange="(e) => UploadDocument(e, block)"
+                                           accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                                           class="file-input" />
+                                @if (uploadingBlockId == block.Id)
+                                {
+                                    <p class="upload-hint">⏳ Загрузка документа...</p>
+                                }
+                            }
+                            <input class="field-input light" @bind="block.Caption" placeholder="Описание документа (необязательно)" />
+                            <button class="btn-sm primary save-btn" @onclick="() => SaveBlock(block)">Сохранить</button>
+                        }
+                        else if (block.Type == "gallery")
+                        {
+                            @if (block.GalleryImages.Any())
+                            {
+                                <div class="gallery-editor">
+                                    @foreach (var img in block.GalleryImages.OrderBy(g => g.SortOrder))
+                                    {
+                                        <div class="gallery-item-editor">
+                                            <img src="@img.ImagePath" alt="фото" class="gallery-thumb" />
+                                            <input class="field-input light" value="@img.Caption"
+                                                   placeholder="Подпись"
+                                                   @onchange="(e) => SaveGalleryCaption(img.Id, e.Value?.ToString())" />
+                                            <button class="btn-icon danger" @onclick="() => DeleteGalleryImage(img.Id, block)">✕</button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            <div class="gallery-upload-area">
+                                <InputFile OnChange="(e) => UploadGalleryImages(e, block)"
+                                           accept="image/*" multiple class="file-input"
+                                           disabled="@(uploadingBlockId == block.Id)" />
+                                @if (uploadingBlockId == block.Id)
+                                {
+                                    <p class="upload-hint">⏳ Загрузка фото...</p>
+                                }
+                            </div>
+                        }
                     </div>
                 }
 
@@ -146,6 +233,8 @@ else
                     <button class="btn-block-type" @onclick='() => AddBlock("text")'>📝 Текст</button>
                     <button class="btn-block-type" @onclick='() => AddBlock("image")'>🖼 Изображение</button>
                     <button class="btn-block-type" @onclick='() => AddBlock("link")'>🔗 Ссылка</button>
+                    <button class="btn-block-type" @onclick='() => AddBlock("gallery")'>🖼🖼 Галерея</button>
+                    <button class="btn-block-type" @onclick='() => AddBlock("document")'>📎 Документ</button>
                 </div>
             </div>
         }
@@ -154,198 +243,74 @@ else
 }
 
 <style>
-    .constructor-layout {
-        display: flex;
-        height: 100vh;
-        overflow: hidden;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-    }
-    .sidebar {
-        width: 260px;
-        min-width: 260px;
-        background: #1a1a2e;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        padding: 1.25rem 1rem;
-        gap: 0.5rem;
-    }
+    .constructor-layout { display: flex; height: 100vh; overflow: hidden; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    .sidebar { width: 270px; min-width: 270px; background: #1a1a2e; color: white; display: flex; flex-direction: column; overflow-y: auto; padding: 1.25rem 1rem; gap: 0.5rem; }
     .sidebar-header { margin-bottom: 1rem; }
     .logo { font-size: 1.1rem; color: white; }
     .logo b { color: #4f6ef7; }
     .user-email { display: block; font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; }
     .section-nav { display: flex; flex-direction: column; gap: 0.25rem; }
-    .nav-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.6rem 0.75rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: #d1d5db;
-        transition: background 0.15s;
-    }
+    .nav-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.75rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; color: #d1d5db; transition: background 0.15s; }
     .nav-item:hover { background: #2d2d4e; }
     .nav-item.active { background: #4f6ef7; color: white; }
     .add-section { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
-    .btn-add-section {
-        background: none;
-        border: 1.5px dashed #4f6ef7;
-        color: #4f6ef7;
-        border-radius: 8px;
-        padding: 0.5rem;
-        cursor: pointer;
-        font-size: 0.85rem;
-        transition: background 0.15s;
-    }
+    .btn-add-section { background: none; border: 1.5px dashed #4f6ef7; color: #4f6ef7; border-radius: 8px; padding: 0.5rem; cursor: pointer; font-size: 0.85rem; transition: background 0.15s; }
     .btn-add-section:hover { background: #2d2d4e; }
-    .sidebar-footer {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: auto;
-        padding-top: 1rem;
-        border-top: 1px solid #2d2d4e;
-    }
-    .design-panel {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid #2d2d4e;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
+    .sidebar-footer { display: flex; gap: 0.5rem; margin-top: auto; padding-top: 1rem; border-top: 1px solid #2d2d4e; }
+    .design-panel { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #2d2d4e; display: flex; flex-direction: column; gap: 0.4rem; }
     .panel-label { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
-    .color-picker { width: 100%; height: 36px; border-radius: 6px; border: none; cursor: pointer; }
-    .editor-main {
-        flex: 1;
-        background: #f0f4f8;
-        overflow-y: auto;
-        padding: 2rem;
-    }
-    .empty-state {
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #9ca3af;
-        font-size: 1.1rem;
-    }
+    .color-picker { width: 100%; height: 32px; border-radius: 6px; border: none; cursor: pointer; }
+    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 0.25rem; }
+    .theme-btn { padding: 0.45rem 0.5rem; border-radius: 7px; border: 2px solid transparent; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.15s; }
+    .theme-btn.active { box-shadow: 0 0 0 2px white; }
+    .editor-main { flex: 1; background: #f0f4f8; overflow-y: auto; padding: 2rem; }
+    .empty-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 1.1rem; }
     .section-editor { display: flex; flex-direction: column; gap: 1.25rem; max-width: 720px; }
     .section-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin: 0; }
-    .block-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.25rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
+    .block-card { background: white; border-radius: 12px; padding: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 0.75rem; }
     .block-header { display: flex; justify-content: space-between; align-items: center; }
-    .block-type-badge {
-        background: #eef2ff;
-        color: #4f6ef7;
-        border-radius: 6px;
-        padding: 0.2rem 0.6rem;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    .block-textarea {
-        width: 100%;
-        border: 1.5px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 0.65rem;
-        font-size: 0.95rem;
-        resize: vertical;
-        outline: none;
-        font-family: inherit;
-        box-sizing: border-box;
-    }
+    .block-type-badge { background: #eef2ff; color: #4f6ef7; border-radius: 6px; padding: 0.2rem 0.6rem; font-size: 0.8rem; font-weight: 600; }
+    .block-design-bar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; background: #f9fafb; border-radius: 8px; padding: 0.6rem 0.75rem; border: 1px solid #e5e7eb; }
+    .align-btns { display: flex; gap: 0.25rem; }
+    .align-btn { width: 30px; height: 30px; border: 1.5px solid #e5e7eb; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+    .align-btn.active { background: #4f6ef7; color: white; border-color: #4f6ef7; }
+    .align-btn:hover:not(.active) { background: #eef2ff; }
+    .font-size-ctrl { display: flex; align-items: center; gap: 0.4rem; }
+    .size-btn { padding: 0.2rem 0.5rem; border: 1.5px solid #e5e7eb; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: background 0.15s; }
+    .size-btn:hover { background: #eef2ff; }
+    .size-val { font-size: 0.8rem; color: #6b7280; min-width: 42px; text-align: center; }
+    .color-ctrl { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #6b7280; }
+    .color-picker-sm { width: 32px; height: 28px; border-radius: 5px; border: 1px solid #e5e7eb; cursor: pointer; padding: 0; }
+    .block-textarea { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 0.65rem; font-size: 0.95rem; resize: vertical; outline: none; font-family: inherit; box-sizing: border-box; }
     .block-textarea:focus { border-color: #4f6ef7; }
-    .file-input {
-        display: block;
-        width: 100%;
-        padding: 0.5rem;
-        border: 1.5px dashed #d1d5db;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        cursor: pointer;
-        background: #f9fafb;
-    }
-    .field-input.light {
-        padding: 0.55rem 0.75rem;
-        border: 1.5px solid #e5e7eb;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        background: white;
-        color: #374151;
-        outline: none;
-        width: 100%;
-        box-sizing: border-box;
-    }
+    .file-input { display: block; width: 100%; padding: 0.5rem; border: 1.5px dashed #d1d5db; border-radius: 8px; font-size: 0.9rem; cursor: pointer; background: #f9fafb; }
+    .img-preview { max-width: 100%; border-radius: 8px; }
+    .field-input.light { padding: 0.55rem 0.75rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; background: white; color: #374151; outline: none; width: 100%; box-sizing: border-box; }
     .field-input.light:focus { border-color: #4f6ef7; }
     .upload-hint { color: #6b7280; font-size: 0.85rem; margin: 0; }
     .save-btn { align-self: flex-end; }
-    .add-block-bar {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        background: white;
-        border-radius: 12px;
-        padding: 1rem 1.25rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .btn-block-type {
-        background: #f3f4f6;
-        border: 1.5px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        cursor: pointer;
-        font-size: 0.9rem;
-        transition: all 0.15s;
-    }
+    .gallery-editor { display: flex; flex-direction: column; gap: 0.75rem; }
+    .gallery-item-editor { display: flex; align-items: center; gap: 0.75rem; background: #f9fafb; border-radius: 8px; padding: 0.5rem; }
+    .gallery-thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+    .gallery-upload-area { border-top: 1px solid #e5e7eb; padding-top: 0.75rem; }
+    .doc-preview { display: flex; align-items: center; gap: 0.75rem; background: #f9fafb; border-radius: 8px; padding: 0.75rem 1rem; border: 1.5px solid #e5e7eb; }
+    .doc-icon { font-size: 2rem; flex-shrink: 0; }
+    .doc-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .doc-name { font-weight: 600; font-size: 0.9rem; color: #1a1a2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .doc-caption { font-size: 0.8rem; color: #6b7280; }
+    .add-block-bar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; background: white; border-radius: 12px; padding: 1rem 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .btn-block-type { background: #f3f4f6; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem; transition: all 0.15s; }
     .btn-block-type:hover { background: #eef2ff; border-color: #4f6ef7; color: #4f6ef7; }
-    .field-group { display: flex; flex-direction: column; gap: 0.3rem; }
-    .field-group label { font-size: 0.78rem; color: #9ca3af; }
-    .field-input {
-        padding: 0.55rem 0.75rem;
-        border: 1.5px solid #2d2d4e;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        background: #16163a;
-        color: white;
-        outline: none;
-    }
+    .field-input { padding: 0.55rem 0.75rem; border: 1.5px solid #2d2d4e; border-radius: 8px; font-size: 0.9rem; background: #16163a; color: white; outline: none; }
     .field-input.small { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
     select.field-input option { background: #1a1a2e; }
     .row-btns { display: flex; gap: 0.5rem; }
-    .btn-sm {
-        padding: 0.4rem 0.8rem;
-        border-radius: 6px;
-        border: 1px solid #2d2d4e;
-        background: #2d2d4e;
-        color: #d1d5db;
-        cursor: pointer;
-        font-size: 0.82rem;
-        transition: background 0.15s;
-    }
+    .btn-sm { padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid #2d2d4e; background: #2d2d4e; color: #d1d5db; cursor: pointer; font-size: 0.82rem; transition: background 0.15s; }
     .btn-sm:hover { background: #3a3a5e; }
     .btn-sm.primary { background: #4f6ef7; border-color: #4f6ef7; color: white; }
     .btn-sm.primary:hover { background: #3b57e0; }
     .btn-sm.danger { border-color: #ef4444; color: #ef4444; background: none; }
-    .btn-sm.danger:hover { background: #3d1515; }
-    .btn-icon {
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 0.85rem;
-        padding: 0.2rem 0.4rem;
-        border-radius: 4px;
-        transition: background 0.15s;
-    }
+    .btn-icon { background: none; border: none; cursor: pointer; font-size: 0.85rem; padding: 0.2rem 0.4rem; border-radius: 4px; transition: background 0.15s; }
     .btn-icon.danger { color: #ef4444; }
     .btn-icon.danger:hover { background: #fef2f2; }
 </style>
@@ -354,38 +319,36 @@ else
     Portfolio? portfolio;
     DesignSetting? design;
     Section? activeSection;
-
     bool addingSectionMode = false;
     string newSectionTitle = string.Empty;
-
-    // Следим за каким блоком идёт загрузка файла
     int? uploadingBlockId = null;
-
     bool initialized = false;
+
+    record ThemeInfo(string bg, string text, string accent, string label);
+    Dictionary<string, ThemeInfo> themes = new()
+    {
+        ["light"]  = new("#ffffff", "#1a1a2e", "#4f6ef7", "☀ Светлая"),
+        ["dark"]   = new("#1a1a2e", "#f3f4f6", "#6b8fff", "🌙 Тёмная"),
+        ["ocean"]  = new("#e0f2fe", "#0c4a6e", "#0284c7", "🌊 Океан"),
+        ["forest"] = new("#f0fdf4", "#14532d", "#16a34a", "🌿 Лес"),
+        ["sunset"] = new("#fff7ed", "#7c2d12", "#ea580c", "🌅 Закат"),
+        ["rose"]   = new("#fff1f2", "#881337", "#e11d48", "🌸 Роза"),
+    };
 
     protected override void OnAfterRender(bool firstRender)
     {
         if (firstRender)
         {
-            if (!Session.IsLoggedIn)
-            {
-                Navigation.NavigateTo("/");
-                return;
-            }
+            if (!Session.IsLoggedIn) { Navigation.NavigateTo("/"); return; }
             portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
             design = portfolio.DesignSetting;
             activeSection = portfolio.Sections.FirstOrDefault();
             initialized = true;
-            StateHasChanged(); // перерисовать с данными
+            StateHasChanged();
         }
     }
 
-    void SelectSection(Section sec)
-    {
-        activeSection = sec;
-    }
-
-    // ===== Разделы =====
+    void SelectSection(Section sec) => activeSection = sec;
 
     void ConfirmAddSection()
     {
@@ -403,8 +366,6 @@ else
         Reload(selectLast: false);
     }
 
-    // ===== Блоки =====
-
     void AddBlock(string type)
     {
         if (activeSection == null) return;
@@ -412,10 +373,7 @@ else
         ReloadSection();
     }
 
-    void SaveBlock(Block block)
-    {
-        DbService.UpdateBlock(block);
-    }
+    void SaveBlock(Block block) => DbService.UpdateBlock(block);
 
     void DeleteBlock(Block block)
     {
@@ -423,36 +381,71 @@ else
         ReloadSection();
     }
 
-    // Загрузка фото — async, потому что работаем с файлом
+    void ClearDocument(Block block)
+    {
+        block.Content = string.Empty;
+        SaveBlock(block);
+    }
+
     async Task UploadImage(InputFileChangeEventArgs e, Block block)
     {
         uploadingBlockId = block.Id;
         StateHasChanged();
-
-        var file = e.File;
-        var path = await DbService.SaveImageAsync(file);
-
+        var path = await DbService.SaveImageAsync(e.File);
         block.Content = path;
         DbService.UpdateBlock(block);
-
         uploadingBlockId = null;
         ReloadSection();
     }
 
-    // ===== Дизайн =====
-
-    void SaveDesign()
+    async Task UploadDocument(InputFileChangeEventArgs e, Block block)
     {
-        if (design != null)
-            DbService.UpdateDesign(design);
+        uploadingBlockId = block.Id;
+        StateHasChanged();
+        var result = await DbService.SaveDocumentAsync(e.File);
+        block.Content = result;
+        DbService.UpdateBlock(block);
+        uploadingBlockId = null;
+        ReloadSection();
     }
 
-    // ===== Навигация =====
+    async Task UploadGalleryImages(InputFileChangeEventArgs e, Block block)
+    {
+        uploadingBlockId = block.Id;
+        StateHasChanged();
+        var sortOrder = block.GalleryImages.Any() ? block.GalleryImages.Max(g => g.SortOrder) + 1 : 0;
+        foreach (var file in e.GetMultipleFiles(20))
+        {
+            var path = await DbService.SaveImageAsync(file);
+            DbService.AddGalleryImage(block.Id, path, null, sortOrder++);
+        }
+        uploadingBlockId = null;
+        ReloadSection();
+    }
 
+    void SaveGalleryCaption(int galleryImageId, string? caption)
+        => DbService.UpdateGalleryImageCaption(galleryImageId, caption);
+
+    void DeleteGalleryImage(int galleryImageId, Block block)
+    {
+        DbService.DeleteGalleryImage(galleryImageId);
+        ReloadSection();
+    }
+
+    void ApplyTheme(string themeKey)
+    {
+        if (design == null || !themes.ContainsKey(themeKey)) return;
+        var t = themes[themeKey];
+        design.Theme       = themeKey;
+        design.Color       = t.bg;
+        design.AccentColor = t.accent;
+        SaveDesign();
+        StateHasChanged();
+    }
+
+    void SaveDesign() { if (design != null) DbService.UpdateDesign(design); }
     void GoToView()   => Navigation.NavigateTo("/view");
     void Logout()     { Session.Logout(); Navigation.NavigateTo("/"); }
-
-    // ===== Вспомогательное =====
 
     void Reload(bool selectLast)
     {
@@ -461,8 +454,7 @@ else
         design = portfolio.DesignSetting;
         activeSection = selectLast
             ? portfolio.Sections.LastOrDefault()
-            : portfolio.Sections.FirstOrDefault(s => s.Id == prevId)
-              ?? portfolio.Sections.FirstOrDefault();
+            : portfolio.Sections.FirstOrDefault(s => s.Id == prevId) ?? portfolio.Sections.FirstOrDefault();
     }
 
     void ReloadSection()
@@ -473,11 +465,36 @@ else
         activeSection = portfolio.Sections.FirstOrDefault(s => s.Id == prevId);
     }
 
+    // ===== Настройки текстового блока =====
+    string AlignClass(Block block, string align) => "align-btn " + (block.TextAlign == align ? "active" : "");
+    void SetAlign(Block block, string align)      { block.TextAlign = align; SaveBlock(block); }
+    void DecreaseFontSize(Block block)            { block.FontSize = Math.Max(10, block.FontSize - 2); SaveBlock(block); }
+    void IncreaseFontSize(Block block)            { block.FontSize = Math.Min(48, block.FontSize + 2); SaveBlock(block); }
+    void SetTextColor(Block block, string? color) { block.TextColor = color ?? "#374151"; SaveBlock(block); }
+
+    // ===== Иконки документов =====
+    string GetDocIcon(string fileName)
+    {
+        var ext = Path.GetExtension(fileName).ToLower();
+        return ext switch
+        {
+            ".pdf"  => "📄",
+            ".doc" or ".docx" => "📝",
+            ".xls" or ".xlsx" => "📊",
+            ".ppt" or ".pptx" => "📋",
+            ".zip" or ".rar"  => "🗜",
+            ".txt"  => "📃",
+            _ => "📎"
+        };
+    }
+
     string BlockTypeLabel(string type) => type switch
     {
-        "text"  => "📝 Текст",
-        "image" => "🖼 Изображение",
-        "link"  => "🔗 Ссылка",
-        _       => type
+        "text"     => "📝 Текст",
+        "image"    => "🖼 Изображение",
+        "link"     => "🔗 Ссылка",
+        "gallery"  => "🖼🖼 Галерея",
+        "document" => "📎 Документ",
+        _          => type
     };
 }

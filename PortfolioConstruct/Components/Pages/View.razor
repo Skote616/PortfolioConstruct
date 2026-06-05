@@ -17,7 +17,7 @@ else
     <div class="portfolio-page" style="background:@bgColor; font-family:@fontFamily">
 
         <header class="portfolio-header" style="border-bottom: 3px solid @accentColor">
-            <div class="header-inner">
+            <div>
                 <h1 class="portfolio-name">@Session.CurrentUserEmail</h1>
                 <p class="portfolio-sub">Студенческое портфолио</p>
             </div>
@@ -58,7 +58,10 @@ else
                     {
                         @if (block.Type == "text")
                         {
-                            <div class="block-text">@block.Content</div>
+                            <div class="block-text"
+                                 style="text-align:@block.TextAlign; font-size:@(block.FontSize)px; color:@block.TextColor">
+                                @block.Content
+                            </div>
                         }
                         else if (block.Type == "image" && !string.IsNullOrWhiteSpace(block.Content))
                         {
@@ -80,6 +83,71 @@ else
                                 <a href="@block.Content" target="_blank">🔗 @block.Content</a>
                             </div>
                         }
+                        else if (block.Type == "document" && !string.IsNullOrWhiteSpace(block.Content))
+                        {
+                            var docInfo = block.Content.Split('|');
+                            var docPath = docInfo[0];
+                            var docName = docInfo.Length > 1 ? docInfo[1] : Path.GetFileName(docPath);
+                            var ext = Path.GetExtension(docName).ToLower();
+                            var icon = ext switch
+                            {
+                                ".pdf"  => "📄",
+                                ".doc" or ".docx" => "📝",
+                                ".xls" or ".xlsx" => "📊",
+                                ".ppt" or ".pptx" => "📋",
+                                ".zip" or ".rar"  => "🗜",
+                                ".txt"  => "📃",
+                                _ => "📎"
+                            };
+                            <div class="block-document">
+                                <div class="doc-file-info">
+                                    <span class="doc-file-icon">@icon</span>
+                                    <div>
+                                        <p class="doc-file-name">@docName</p>
+                                        @if (!string.IsNullOrWhiteSpace(block.Caption))
+                                        {
+                                            <p class="doc-file-caption">@block.Caption</p>
+                                        }
+                                    </div>
+                                </div>
+                                <a href="@docPath" target="_blank" download class="btn-download">⬇ Скачать</a>
+                            </div>
+                        }
+                        else if (block.Type == "gallery" && block.GalleryImages.Any())
+                        {
+                            var images = block.GalleryImages.OrderBy(g => g.SortOrder).ToList();
+                            var idx = GetGalleryIndex(block.Id, images.Count);
+                            <div class="block-gallery">
+                                <div class="gallery-viewer">
+                                    <button class="gallery-arrow left"
+                                            @onclick="() => PrevImage(block.Id, images.Count)"
+                                            disabled="@(images.Count <= 1)">‹</button>
+
+                                    <div class="gallery-slide">
+                                        <img src="@images[idx].ImagePath" alt="фото @(idx+1)" />
+                                        @if (!string.IsNullOrWhiteSpace(images[idx].Caption))
+                                        {
+                                            <p class="block-caption">@images[idx].Caption</p>
+                                        }
+                                    </div>
+
+                                    <button class="gallery-arrow right"
+                                            @onclick="() => NextImage(block.Id, images.Count)"
+                                            disabled="@(images.Count <= 1)">›</button>
+                                </div>
+
+                                <div class="gallery-dots">
+                                    @for (int i = 0; i < images.Count; i++)
+                                    {
+                                        var dotIdx = i;
+                                        <button class="dot @(dotIdx == idx ? "active" : "")"
+                                                @onclick="() => SetGalleryIndex(block.Id, dotIdx)"></button>
+                                    }
+                                </div>
+
+                                <p class="gallery-counter">@(idx + 1) / @images.Count</p>
+                            </div>
+                        }
                     }
                 }
             }
@@ -88,121 +156,51 @@ else
 }
 
 <style>
-    .portfolio-page {
-        min-height: 100vh;
-        transition: background 0.3s;
-    }
-    .portfolio-header {
-        padding: 2rem 3rem;
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        background: rgba(255,255,255,0.85);
-        backdrop-filter: blur(6px);
-    }
+    .portfolio-page { min-height: 100vh; transition: background 0.3s; }
+    .portfolio-header { padding: 2rem 3rem; display: flex; align-items: flex-start; justify-content: space-between; background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); }
     .portfolio-name { margin: 0; font-size: 1.8rem; font-weight: 700; color: #1a1a2e; }
     .portfolio-sub  { margin: 0.25rem 0 0; color: #6b7280; font-size: 0.95rem; }
-    .btn-back {
-        background: none;
-        border: 1.5px solid #4f6ef7;
-        color: #4f6ef7;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        white-space: nowrap;
-        transition: background 0.15s;
-    }
+    .btn-back { background: none; border: 1.5px solid #4f6ef7; color: #4f6ef7; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; transition: background 0.15s; }
     .btn-back:hover { background: #eef2ff; }
-    .btn-export {
-        background: #4f6ef7;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        white-space: nowrap;
-        transition: background 0.15s;
-    }
+    .btn-export { background: #4f6ef7; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; transition: background 0.15s; }
     .btn-export:hover:not(:disabled) { background: #3b57e0; }
     .btn-export:disabled { opacity: 0.6; cursor: not-allowed; }
-    .portfolio-nav {
-        display: flex;
-        gap: 0.25rem;
-        padding: 0 2rem;
-        background: rgba(255,255,255,0.7);
-        border-bottom: 1px solid #e5e7eb;
-        flex-wrap: wrap;
-    }
-    .nav-link {
-        padding: 0.75rem 1.25rem;
-        color: #374151;
-        font-size: 0.95rem;
-        border: none;
-        border-bottom: 3px solid transparent;
-        background: none;
-        transition: all 0.15s;
-        cursor: pointer;
-        font-family: inherit;
-    }
+    .portfolio-nav { display: flex; gap: 0.25rem; padding: 0 2rem; background: rgba(255,255,255,0.7); border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
+    .nav-link { padding: 0.75rem 1.25rem; color: #374151; font-size: 0.95rem; border: none; border-bottom: 3px solid transparent; background: none; transition: all 0.15s; cursor: pointer; font-family: inherit; }
     .nav-link:hover  { color: #4f6ef7; }
     .nav-link.active { color: #4f6ef7; border-bottom-color: #4f6ef7; font-weight: 600; }
-    .portfolio-content {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 2.5rem 2rem;
-        display: flex;
-        flex-direction: column;
-        gap: 1.5rem;
-    }
-    .section-heading {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin: 0 0 0.5rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid currentColor;
-    }
-    .block-text {
-        background: rgba(255,255,255,0.8);
-        border-radius: 12px;
-        padding: 1.25rem 1.5rem;
-        font-size: 1rem;
-        line-height: 1.7;
-        color: #374151;
-        white-space: pre-wrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .block-image {
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-        background: white;
-    }
+    .portfolio-content { max-width: 800px; margin: 0 auto; padding: 2.5rem 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+    .section-heading { font-size: 1.5rem; font-weight: 700; margin: 0 0 0.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid currentColor; }
+    .block-text { background: rgba(255,255,255,0.8); border-radius: 12px; padding: 1.25rem 1.5rem; font-size: 1rem; line-height: 1.7; color: #374151; white-space: pre-wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .block-image { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.1); background: white; }
     .block-image img { width: 100%; display: block; }
-    .block-caption {
-        padding: 0.6rem 1rem;
-        margin: 0;
-        font-size: 0.85rem;
-        color: #6b7280;
-        font-style: italic;
-        text-align: center;
-    }
-    .block-link {
-        background: rgba(255,255,255,0.8);
-        border-radius: 12px;
-        padding: 1rem 1.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    .link-label {
-        margin: 0 0 0.4rem;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #374151;
-    }
+    .block-caption { padding: 0.6rem 1rem; margin: 0; font-size: 0.85rem; color: #6b7280; font-style: italic; text-align: center; }
+    .block-link { background: rgba(255,255,255,0.8); border-radius: 12px; padding: 1rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .link-label { margin: 0 0 0.4rem; font-size: 0.9rem; font-weight: 600; color: #374151; }
     .block-link a { color: #4f6ef7; text-decoration: none; word-break: break-all; }
     .block-link a:hover { text-decoration: underline; }
+
+    /* Галерея */
+    .block-gallery { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    .gallery-viewer { display: flex; align-items: center; gap: 0; position: relative; }
+    .gallery-slide { flex: 1; overflow: hidden; }
+    .gallery-slide img { width: 100%; display: block; max-height: 480px; object-fit: contain; background: #f9fafb; }
+    .gallery-arrow { width: 44px; min-width: 44px; height: 100%; background: rgba(0,0,0,0.35); color: white; border: none; font-size: 1.8rem; cursor: pointer; transition: background 0.15s; padding: 0; display: flex; align-items: center; justify-content: center; }
+    .gallery-arrow:hover:not(:disabled) { background: rgba(0,0,0,0.6); }
+    .gallery-arrow:disabled { opacity: 0.2; cursor: default; }
+    .gallery-dots { display: flex; justify-content: center; gap: 6px; padding: 0.75rem 0 0.25rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; border: none; background: #d1d5db; cursor: pointer; padding: 0; transition: background 0.15s; }
+    .dot.active { background: #4f6ef7; }
+    .gallery-counter { text-align: center; font-size: 0.8rem; color: #9ca3af; padding-bottom: 0.75rem; margin: 0; }
+
     .empty-hint { color: #9ca3af; font-size: 1rem; font-style: italic; }
+    .block-document { background: rgba(255,255,255,0.85); border-radius: 12px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .doc-file-info { display: flex; align-items: center; gap: 1rem; flex: 1; overflow: hidden; }
+    .doc-file-icon { font-size: 2.5rem; flex-shrink: 0; }
+    .doc-file-name { margin: 0; font-weight: 600; font-size: 1rem; color: #1a1a2e; word-break: break-word; }
+    .doc-file-caption { margin: 0.25rem 0 0; font-size: 0.85rem; color: #6b7280; }
+    .btn-download { background: #4f6ef7; color: white; border: none; padding: 0.6rem 1.1rem; border-radius: 8px; text-decoration: none; font-size: 0.9rem; white-space: nowrap; transition: background 0.15s; }
+    .btn-download:hover { background: #3b57e0; }
 </style>
 
 @code {
@@ -211,19 +209,18 @@ else
     bool initialized = false;
     bool exporting = false;
 
-    string bgColor     => portfolio?.DesignSetting?.Color ?? "#f0f4f8";
-    string fontFamily  => portfolio?.DesignSetting?.Font  ?? "Arial";
-    string accentColor => "#4f6ef7";
+    // Словарь: blockId -> текущий индекс фото в галерее
+    Dictionary<int, int> galleryIndexes = new();
+
+    string bgColor    => portfolio?.DesignSetting?.Color ?? "#f0f4f8";
+    string fontFamily => portfolio?.DesignSetting?.Font  ?? "Arial";
+    string accentColor => portfolio?.DesignSetting?.AccentColor ?? "#4f6ef7";
 
     protected override void OnAfterRender(bool firstRender)
     {
         if (firstRender)
         {
-            if (!Session.IsLoggedIn)
-            {
-                Navigation.NavigateTo("/");
-                return;
-            }
+            if (!Session.IsLoggedIn) { Navigation.NavigateTo("/"); return; }
             portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
             activeViewSection = portfolio.Sections.FirstOrDefault();
             initialized = true;
@@ -232,25 +229,43 @@ else
     }
 
     void SetSection(Section sec)
+        => activeViewSection = portfolio?.Sections.FirstOrDefault(s => s.Id == sec.Id);
+
+    // ===== Галерея =====
+
+    int GetGalleryIndex(int blockId, int count)
     {
-        activeViewSection = portfolio?.Sections.FirstOrDefault(s => s.Id == sec.Id);
+        if (!galleryIndexes.ContainsKey(blockId)) galleryIndexes[blockId] = 0;
+        return Math.Clamp(galleryIndexes[blockId], 0, Math.Max(0, count - 1));
     }
+
+    void NextImage(int blockId, int count)
+    {
+        var idx = GetGalleryIndex(blockId, count);
+        galleryIndexes[blockId] = (idx + 1) % count;
+    }
+
+    void PrevImage(int blockId, int count)
+    {
+        var idx = GetGalleryIndex(blockId, count);
+        galleryIndexes[blockId] = (idx - 1 + count) % count;
+    }
+
+    void SetGalleryIndex(int blockId, int idx)
+        => galleryIndexes[blockId] = idx;
+
+    // ===== Экспорт =====
 
     async Task ExportHtml()
     {
         if (portfolio == null) return;
         exporting = true;
         StateHasChanged();
-
         var zipBytes = ExportService.GenerateHtmlZip(portfolio, Session.CurrentUserEmail);
         var base64 = Convert.ToBase64String(zipBytes);
         await JS.InvokeVoidAsync("downloadFile", "portfolio.zip", "application/zip", base64);
-
         exporting = false;
     }
 
-    void GoToConstructor()
-    {
-        Navigation.NavigateTo("/constructor");
-    }
+    void GoToConstructor() => Navigation.NavigateTo("/constructor");
 }

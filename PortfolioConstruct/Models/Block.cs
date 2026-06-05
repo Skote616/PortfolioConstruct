@@ -1,22 +1,21 @@
-using System;
-using System.Collections.Generic;
-
 namespace PortfolioConstruct.Models;
 
 public partial class Block
 {
     public int Id { get; set; }
-
     public int SectionId { get; set; }
 
-    // Тип блока: "text", "image", "link"
+    // Тип: "text", "image", "link", "gallery"
     public string Type { get; set; } = null!;
 
-    // Основное содержимое: текст / путь к файлу / URL
     public string Content { get; set; } = string.Empty;
-
-    // Подпись: подпись к фото, описание ссылки и т.п.
     public string? Caption { get; set; }
 
+    // Настройки дизайна блока
+    public string TextAlign  { get; set; } = "left";   // left | center | right
+    public int    FontSize   { get; set; } = 16;        // px
+    public string TextColor  { get; set; } = "#374151"; // hex
+
     public virtual Section Section { get; set; } = null!;
+    public virtual ICollection<GalleryImage> GalleryImages { get; set; } = new List<GalleryImage>();
 }
