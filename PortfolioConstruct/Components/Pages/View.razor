@@ -1,11 +1,12 @@
 @page "/view"
 @inject NavigationManager Navigation
-@inject DBService DbService
+@inject IPortfolioService PortfolioService
 @inject SessionService Session
 @inject HtmlExportService ExportService
 @inject IJSRuntime JS
 @using PortfolioConstruct.Models
 @using PortfolioConstruct.Service
+@using PortfolioConstruct.Services
 @rendermode InteractiveServer
 
 @if (!initialized)
@@ -221,7 +222,7 @@ else
         if (firstRender)
         {
             if (!Session.IsLoggedIn) { Navigation.NavigateTo("/"); return; }
-            portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+            portfolio = PortfolioService.GetOrCreatePortfolio(Session.CurrentUserId);
             activeViewSection = portfolio.Sections.FirstOrDefault();
             initialized = true;
             StateHasChanged();

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PortfolioConstruct.Models;
 
@@ -11,9 +12,11 @@ using PortfolioConstruct.Models;
 namespace PortfolioConstruct.Migrations
 {
     [DbContext(typeof(PortfolioContext))]
-    partial class PortfolioContextModelSnapshot : ModelSnapshot
+    [Migration("20260607164032_AddBlockTypeRoleProfile")]
+    partial class AddBlockTypeRoleProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -85,6 +88,10 @@ namespace PortfolioConstruct.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
@@ -98,35 +105,40 @@ namespace PortfolioConstruct.Migrations
                             Id = 1,
                             Code = "text",
                             Icon = "📝",
-                            IsActive = true
+                            IsActive = true,
+                            Label = "Текст"
                         },
                         new
                         {
                             Id = 2,
                             Code = "image",
                             Icon = "🖼",
-                            IsActive = true
+                            IsActive = true,
+                            Label = "Изображение"
                         },
                         new
                         {
                             Id = 3,
                             Code = "link",
                             Icon = "🔗",
-                            IsActive = true
+                            IsActive = true,
+                            Label = "Ссылка"
                         },
                         new
                         {
                             Id = 4,
                             Code = "gallery",
                             Icon = "🖼🖼",
-                            IsActive = true
+                            IsActive = true,
+                            Label = "Галерея"
                         },
                         new
                         {
                             Id = 5,
                             Code = "document",
                             Icon = "📎",
-                            IsActive = true
+                            IsActive = true,
+                            Label = "Документ"
                         });
                 });
 
@@ -201,6 +213,10 @@ namespace PortfolioConstruct.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("About")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
@@ -224,6 +240,10 @@ namespace PortfolioConstruct.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
@@ -235,12 +255,14 @@ namespace PortfolioConstruct.Migrations
                         new
                         {
                             Id = 1,
-                            Code = "User"
+                            Code = "User",
+                            Label = "Пользователь"
                         },
                         new
                         {
                             Id = 2,
-                            Code = "Admin"
+                            Code = "Admin",
+                            Label = "Администратор"
                         });
                 });
 

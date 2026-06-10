@@ -1,9 +1,9 @@
 @page "/"
 @inject NavigationManager Navigation
-@inject DBService DbService
+@inject IAuthService AuthService
 @inject SessionService Session
 @using PortfolioConstruct.Models
-@using PortfolioConstruct.Service
+@using PortfolioConstruct.Services
 @using System.Net.Mail;
 @attribute [Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryToken]
 @rendermode InteractiveServer
@@ -134,7 +134,7 @@
         isLoading = true;
         await Task.Yield(); // даём Blazor перерисовать кнопку
 
-        var user = DbService.Login(email, password);
+        var user = AuthService.Login(email, password);
 
         if (user != null)
         {
@@ -188,11 +188,11 @@
         isLoading = true;
         await Task.Yield();
 
-        bool success = DbService.Register(email, password);
+        bool success = AuthService.Register(email, password);
 
         if (success)
         {
-            var user = DbService.Login(email, password);
+            var user = AuthService.Login(email, password);
             Session.Login(user!);
             Navigation.NavigateTo("/constructor");
         }

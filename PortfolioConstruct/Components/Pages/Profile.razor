@@ -1,0 +1,182 @@
+@page "/profile"
+@inject NavigationManager Navigation
+@inject IStudentProfileService ProfileService
+@inject SessionService Session
+@inject IFileService FileService
+@using PortfolioConstruct.Models
+@using PortfolioConstruct.Services
+@using Microsoft.AspNetCore.Components.Forms
+@rendermode InteractiveServer
+
+@if (!initialized) { <p style="padding:2rem;color:#9ca3af">Загрузка...</p> return; }
+
+<div class="profile-layout">
+    <header class="profile-header">
+        <span class="logo">Portfolio<b>Construct</b></span>
+        <div style="display:flex;gap:0.75rem">
+            <button class="btn-sm" @onclick="GoToConstructor">← Конструктор</button>
+            <button class="btn-sm danger" @onclick="Logout">Выйти</button>
+        </div>
+    </header>
+
+    <main class="profile-main">
+        <div class="profile-card">
+            <h2 class="profile-title">Личные данные</h2>
+            <p class="profile-sub">Эта информация отображается в вашем портфолио</p>
+
+            @if (saved)
+            {
+                <div class="alert-success">✓ Данные сохранены</div>
+            }
+
+            <!-- Аватар -->
+            <div class="avatar-section">
+                @if (!string.IsNullOrWhiteSpace(profile.AvatarPath))
+                {
+                    <img src="@profile.AvatarPath" class="avatar-img" alt="Фото" />
+                }
+                else
+                {
+                    <div class="avatar-placeholder">👤</div>
+                }
+                <div>
+                    <InputFile OnChange="UploadAvatar" accept="image/*" class="file-input" />
+                    <p class="hint">Фото профиля, до 5 МБ</p>
+                </div>
+            </div>
+
+            <!-- Поля -->
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>ФИО <span class="required">*</span></label>
+                    <input class="form-input" @bind="profile.FullName"
+                           placeholder="Иванов Иван Иванович" />
+                </div>
+
+                <div class="form-group">
+                    <label>Группа</label>
+                    <input class="form-input" @bind="profile.GroupName"
+                           placeholder="ИСП-23" />
+                </div>
+
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input class="form-input" @bind="profile.Phone"
+                           placeholder="+7 (999) 000-00-00" />
+                </div>
+
+                <div class="form-group full">
+                    <label>Специальность</label>
+                    <select class="form-input" @bind="profile.Specialty">
+                        <option value="">— Выберите специальность —</option>
+                        @foreach (var s in specialties)
+                        {
+                            <option value="@s.Code">@s.Code — @s.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-footer">
+                <button class="btn-primary" @onclick="Save">Сохранить</button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<style>
+    * { box-sizing: border-box; }
+    .profile-layout { min-height: 100vh; background: #f0f4f8; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    .profile-header { background: #1a1a2e; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { color: white; font-size: 1.1rem; font-weight: 600; }
+    .logo b { color: #4f6ef7; }
+    .profile-main { max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
+    .profile-card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+    .profile-title { font-size: 1.4rem; font-weight: 700; color: #1a1a2e; margin: 0 0 0.25rem; }
+    .profile-sub { color: #6b7280; font-size: 0.9rem; margin: 0 0 1.5rem; }
+
+    .alert-success { background: #dcfce7; border: 1px solid #86efac; color: #15803d; border-radius: 8px; padding: 0.65rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
+
+    /* Аватар */
+    .avatar-section { display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.75rem; padding-bottom: 1.75rem; border-bottom: 1px solid #f3f4f6; }
+    .avatar-img { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 3px solid #e5e7eb; }
+    .avatar-placeholder { width: 88px; height: 88px; border-radius: 50%; background: #eef2ff; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; border: 3px solid #e5e7eb; flex-shrink: 0; }
+    .file-input { font-size: 0.85rem; color: #6b7280; }
+    .hint { font-size: 0.78rem; color: #9ca3af; margin: 0.3rem 0 0; }
+
+    /* Форма */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: #374151; }
+    .required { color: #ef4444; }
+    .form-input { padding: 0.65rem 0.9rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; font-family: inherit; }
+    .form-input:focus { border-color: #4f6ef7; }
+    select.form-input { cursor: pointer; background: white; }
+
+    .form-footer { display: flex; justify-content: flex-end; margin-top: 1.5rem; }
+    .btn-primary { background: #4f6ef7; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #3b57e0; }
+    .btn-sm { padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid #d1d5db; background: white; color: #374151; cursor: pointer; font-size: 0.85rem; }
+    .btn-sm.danger { border-color: #ef4444; color: #ef4444; }
+
+    @@media (max-width: 500px) {
+        .form-grid { grid-template-columns: 1fr; }
+        .form-group.full { grid-column: 1; }
+    }
+</style>
+
+@code {
+    StudentProfile profile = new();
+    bool initialized = false;
+    bool saved = false;
+
+    record SpecialtyItem(string Code, string Name);
+
+    List<SpecialtyItem> specialties = new()
+    {
+        new("08.02.04", "Водоснабжение и водоотведение"),
+        new("43.02.16", "Туризм и гостеприимство"),
+        new("08.02.01", "Строительство и эксплуатация зданий и сооружений"),
+        new("23.02.08", "Строительство железных дорог, путь и путевое хозяйство"),
+        new("08.02.08", "Монтаж и эксплуатация оборудования и систем газоснабжения"),
+        new("54.02.01", "Дизайн (по отраслям)"),
+        new("27.02.03", "Автоматика и телемеханика на транспорте (железнодорожном транспорте)"),
+        new("09.02.07", "Информационные системы и программирование"),
+        new("18.02.12", "Технология аналитического контроля химических соединений"),
+        new("08.02.12", "Строительство и эксплуатация автомобильных дорог, аэродромов и городских путей сообщения"),
+        new("38.02.07", "Банковское дело"),
+        new("20.02.01", "Экологическая безопасность природных комплексов"),
+    };
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (!Session.IsLoggedIn) { Navigation.NavigateTo("/"); return; }
+            profile = ProfileService.GetOrCreate(Session.CurrentUserId);
+            initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    void Save()
+    {
+        profile.UserId = Session.CurrentUserId;
+        ProfileService.Save(profile);
+        saved = true;
+        StateHasChanged();
+        // Убираем уведомление через 3 секунды
+        Task.Delay(3000).ContinueWith(_ => { saved = false; InvokeAsync(StateHasChanged); });
+    }
+
+    async Task UploadAvatar(InputFileChangeEventArgs e)
+    {
+        var path = await ProfileService.SaveAvatarAsync(e.File);
+        profile.AvatarPath = path;
+        StateHasChanged();
+    }
+
+    void GoToConstructor() => Navigation.NavigateTo("/constructor");
+    void Logout() { Session.Logout(); Navigation.NavigateTo("/"); }
+}

@@ -9,8 +9,6 @@ public partial class Portfolio
 
     public int UserId { get; set; }
 
-    public string About { get; set; } = null!;
-
     public virtual DesignSetting? DesignSetting { get; set; }
 
     public virtual ICollection<Section> Sections { get; set; } = new List<Section>();

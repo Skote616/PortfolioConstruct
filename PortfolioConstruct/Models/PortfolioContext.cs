@@ -1,79 +1,128 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
 namespace PortfolioConstruct.Models;
 
 public partial class PortfolioContext : DbContext
 {
-    public PortfolioContext()
-    {
-    }
+    public PortfolioContext() { }
+    public PortfolioContext(DbContextOptions<PortfolioContext> options) : base(options) { }
 
-    public PortfolioContext(DbContextOptions<PortfolioContext> options)
-        : base(options)
-    {
-    }
+    public virtual DbSet<Block>          Blocks          { get; set; }
+    public virtual DbSet<BlockType>      BlockTypes      { get; set; }
+    public virtual DbSet<DesignSetting>  DesignSettings  { get; set; }
+    public virtual DbSet<GalleryImage>   GalleryImages   { get; set; }
+    public virtual DbSet<Portfolio>      Portfolios      { get; set; }
+    public virtual DbSet<Role>           Roles           { get; set; }
+    public virtual DbSet<Section>        Sections        { get; set; }
+    public virtual DbSet<StudentProfile> StudentProfiles { get; set; }
+    public virtual DbSet<User>           Users           { get; set; }
 
-    public virtual DbSet<Block> Blocks { get; set; }
-    public virtual DbSet<DesignSetting> DesignSettings { get; set; }
-    public virtual DbSet<Portfolio> Portfolios { get; set; }
-    public virtual DbSet<Section> Sections { get; set; }
-    public virtual DbSet<User> Users { get; set; }
-
-    // Новая таблица для фото галереи
-    public virtual DbSet<GalleryImage> GalleryImages { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        // Строка подключения берётся из appsettings.json через DI
-        // Этот метод остаётся пустым
-    }
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) { }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Block>(entity =>
+        // ===== Block =====
+        modelBuilder.Entity<Block>(e =>
         {
-            entity.ToTable("Block");
-            entity.HasIndex(e => e.SectionId, "IX_Block_SectionId");
-            entity.HasOne(d => d.Section).WithMany(p => p.Blocks).HasForeignKey(d => d.SectionId);
+            e.ToTable("Block");
+            e.HasIndex(b => b.SectionId);
+            e.HasIndex(b => b.BlockTypeId);
+            e.HasOne(b => b.Section)
+             .WithMany(s => s.Blocks)
+             .HasForeignKey(b => b.SectionId);
+            e.HasOne(b => b.BlockType)
+             .WithMany(t => t.Blocks)
+             .HasForeignKey(b => b.BlockTypeId);
+            // Type — вычисляемое свойство, не маппим в колонку
+            e.Ignore(b => b.Type);
         });
 
-        modelBuilder.Entity<GalleryImage>(entity =>
+        // ===== BlockType (справочник) =====
+        modelBuilder.Entity<BlockType>(e =>
         {
-            entity.ToTable("GalleryImage");
-            entity.HasIndex(e => e.BlockId, "IX_GalleryImage_BlockId");
-            entity.HasOne(d => d.Block)
-                  .WithMany(p => p.GalleryImages)
-                  .HasForeignKey(d => d.BlockId)
-                  .OnDelete(DeleteBehavior.Cascade); // удаляем фото вместе с блоком
+            e.ToTable("BlockType");
+            e.HasIndex(t => t.Code).IsUnique();
+            // Заполняем справочник при создании БД
+            e.HasData(
+                new BlockType { Id = 1, Code = "text", Icon = "📝", IsActive = true },
+                new BlockType { Id = 2, Code = "image", Icon = "🖼", IsActive = true },
+                new BlockType { Id = 3, Code = "link", Icon = "🔗", IsActive = true },
+                new BlockType { Id = 4, Code = "gallery", Icon = "🖼🖼", IsActive = true },
+                new BlockType { Id = 5, Code = "document", Icon = "📎", IsActive = true }
+            );
         });
 
-        modelBuilder.Entity<DesignSetting>(entity =>
+        // ===== GalleryImage =====
+        modelBuilder.Entity<GalleryImage>(e =>
         {
-            entity.HasIndex(e => e.PortfolioId, "IX_DesignSettings_PortfolioId").IsUnique();
-            entity.HasOne(d => d.Portfolio).WithOne(p => p.DesignSetting).HasForeignKey<DesignSetting>(d => d.PortfolioId);
+            e.ToTable("GalleryImage");
+            e.HasIndex(g => g.BlockId);
+            e.HasOne(g => g.Block)
+             .WithMany(b => b.GalleryImages)
+             .HasForeignKey(g => g.BlockId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<Portfolio>(entity =>
+        // ===== DesignSetting =====
+        modelBuilder.Entity<DesignSetting>(e =>
         {
-            entity.HasIndex(e => e.UserId, "IX_Portfolios_UserId").IsUnique();
-            entity.HasOne(d => d.User).WithOne(p => p.Portfolio).HasForeignKey<Portfolio>(d => d.UserId);
+            e.HasIndex(d => d.PortfolioId).IsUnique();
+            e.HasOne(d => d.Portfolio)
+             .WithOne(p => p.DesignSetting)
+             .HasForeignKey<DesignSetting>(d => d.PortfolioId);
         });
 
-        modelBuilder.Entity<Section>(entity =>
+        // ===== Portfolio =====
+        modelBuilder.Entity<Portfolio>(e =>
         {
-            entity.ToTable("Section");
-            entity.HasIndex(e => e.PortfolioId, "IX_Section_PortfolioId");
-            entity.HasOne(d => d.Portfolio).WithMany(p => p.Sections).HasForeignKey(d => d.PortfolioId);
+            e.HasIndex(p => p.UserId).IsUnique();
+            e.HasOne(p => p.User)
+             .WithOne(u => u.Portfolio)
+             .HasForeignKey<Portfolio>(p => p.UserId);
         });
 
-        modelBuilder.Entity<User>(entity =>
+        // ===== Role (справочник) =====
+        modelBuilder.Entity<Role>(e =>
         {
-            entity.HasKey(e => e.Id).HasName("PK_Users");
-            entity.ToTable("User");
-            entity.Property(e => e.Email).HasMaxLength(50);
-            entity.Property(e => e.PasswordHash).HasMaxLength(50);
+            e.ToTable("Role");
+            e.HasIndex(r => r.Code).IsUnique();
+            e.HasData(
+                new Role { Id = 1, Code = "User"},
+                new Role { Id = 2, Code = "Admin"}
+            );
+        });
+
+        // ===== Section =====
+        modelBuilder.Entity<Section>(e =>
+        {
+            e.ToTable("Section");
+            e.HasIndex(s => s.PortfolioId);
+            e.HasOne(s => s.Portfolio)
+             .WithMany(p => p.Sections)
+             .HasForeignKey(s => s.PortfolioId);
+        });
+
+        // ===== StudentProfile =====
+        modelBuilder.Entity<StudentProfile>(e =>
+        {
+            e.ToTable("StudentProfile");
+            e.HasIndex(p => p.UserId).IsUnique();
+            e.HasOne(p => p.User)
+             .WithOne(u => u.StudentProfile)
+             .HasForeignKey<StudentProfile>(p => p.UserId);
+        });
+
+        // ===== User =====
+        modelBuilder.Entity<User>(e =>
+        {
+            e.HasKey(u => u.Id).HasName("PK_Users");
+            e.ToTable("User");
+            e.Property(u => u.Email).HasMaxLength(200);
+            e.Property(u => u.PasswordHash).HasMaxLength(200);
+            e.HasIndex(u => u.RoleId);
+            e.HasOne(u => u.Role)
+             .WithMany(r => r.Users)
+             .HasForeignKey(u => u.RoleId);
         });
 
         OnModelCreatingPartial(modelBuilder);

@@ -1,0 +1,418 @@
+@page "/admin"
+@inject NavigationManager Navigation
+@inject IAdminService AdminService
+@inject SessionService Session
+@using PortfolioConstruct.Models
+@using PortfolioConstruct.Services
+@rendermode InteractiveServer
+
+@if (!initialized) { <p style="padding:2rem;color:#9ca3af">Загрузка...</p> return; }
+
+<div class="admin-layout">
+    <header class="admin-header">
+        <div class="header-brand">
+            <span class="logo">Portfolio<b>Construct</b></span>
+            <span class="badge-admin">Администратор</span>
+        </div>
+        <div class="header-actions">
+            <span class="admin-email">@Session.CurrentUserEmail</span>
+            <button class="btn-sm" @onclick="GoToConstructor">← Портфолио</button>
+            <button class="btn-sm danger" @onclick="Logout">Выйти</button>
+        </div>
+    </header>
+
+    <main class="admin-main">
+        <div class="admin-toolbar">
+            <h1 class="admin-title">Управление пользователями</h1>
+            <button class="btn-primary" @onclick="() => showCreateModal = true">+ Добавить пользователя</button>
+        </div>
+
+        <!-- Поиск и фильтр -->
+        <div class="filter-bar">
+            <input class="search-input" @bind="searchQuery" @bind:event="oninput"
+                   placeholder="Поиск по email или имени..." />
+            <select class="filter-select" @bind="filterRole">
+                <option value="">Все роли</option>
+                <option value="User">Пользователи</option>
+                <option value="Admin">Администраторы</option>
+            </select>
+            <select class="filter-select" @bind="filterStatus">
+                <option value="active">Активные</option>
+                <option value="archived">Архивированные</option>
+                <option value="">Все</option>
+            </select>
+        </div>
+
+        <!-- Таблица пользователей -->
+        <div class="users-table-wrap">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Имя</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th>Дата регистрации</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in FilteredUsers)
+                    {
+                        <tr class="@(user.IsArchived ? "row-archived" : "")">
+                            <td>@user.Id</td>
+                            <td>@user.Email</td>
+                            <td>@(user.StudentProfile?.FullName ?? "—")</td>
+                            <td>
+                                <span class="role-badge @(user.Role?.Code == "Admin" ? "admin" : "user")">
+                                    @(user.Role?.Code == "Admin" ? "Администратор" : "Пользователь")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-badge @(user.IsArchived ? "archived" : "active")">
+                                    @(user.IsArchived ? "Архив" : "Активен")
+                                </span>
+                            </td>
+                            <td>@user.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="btn-xs edit" @onclick="() => OpenEdit(user)">✏ Изменить</button>
+                                    @if (user.IsArchived)
+                                    {
+                                        <button class="btn-xs restore" @onclick="() => Restore(user.Id)">↩ Восстановить</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-xs archive" @onclick="() => Archive(user.Id)"
+                                                disabled="@(user.Id == Session.CurrentUserId)">
+                                            🗄 Архивировать
+                                        </button>
+                                    }
+                                    <button class="btn-xs danger" @onclick="() => ConfirmDelete(user)"
+                                            disabled="@(user.Id == Session.CurrentUserId)">
+                                        🗑 Удалить
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredUsers.Any())
+                    {
+                        <tr><td colspan="7" class="empty-row">Пользователи не найдены</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Модальное окно: создание пользователя -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop" @onclick="() => showCreateModal = false">
+        <div class="modal" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Новый пользователь</h3>
+            @if (!string.IsNullOrEmpty(createError))
+            {
+                <div class="alert-error">@createError</div>
+            }
+            <div class="form-group">
+                <label>Email</label>
+                <input class="form-input" @bind="createEmail" placeholder="user@example.com" />
+            </div>
+            <div class="form-group">
+                <label>ФИО</label>
+                <input class="form-input" @bind="createName" placeholder="Иванов Иван Иванович" />
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input class="form-input" type="password" @bind="createPassword" />
+            </div>
+            <div class="form-group">
+                <label>Роль</label>
+                <select class="form-input" @bind="createRole">
+                    <option value="1">Пользователь</option>
+                    <option value="2">Администратор</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" @onclick="CreateUser">Создать</button>
+                <button class="btn-sm" @onclick="() => showCreateModal = false">Отмена</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Модальное окно: редактирование -->
+@if (editUser != null)
+{
+    <div class="modal-backdrop" @onclick="CloseEdit">
+        <div class="modal" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Редактирование: @editUser.Email</h3>
+            @if (!string.IsNullOrEmpty(editError))
+            {
+                <div class="alert-error">@editError</div>
+            }
+            <div class="form-group">
+                <label>Email</label>
+                <input class="form-input" @bind="editUser.Email" />
+            </div>
+            <div class="form-group">
+                <label>ФИО</label>
+                <input class="form-input" @bind="editFullName" placeholder="Не указано" />
+            </div>
+            <div class="form-group">
+                <label>Роль</label>
+                <select class="form-input" @bind="editRoleId">
+                    <option value="1">Пользователь</option>
+                    <option value="2">Администратор</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Новый пароль (оставьте пустым чтобы не менять)</label>
+                <input class="form-input" type="password" @bind="editNewPassword" placeholder="••••••••" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" @onclick="SaveEdit">Сохранить</button>
+                <button class="btn-sm" @onclick="CloseEdit">Отмена</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Модальное окно: подтверждение удаления -->
+@if (deleteUser != null)
+{
+    <div class="modal-backdrop" @onclick="() => deleteUser = null">
+        <div class="modal small" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Удалить пользователя?</h3>
+            <p style="color:#6b7280;margin:0.5rem 0 1.5rem">
+                <b>@deleteUser.Email</b> будет удалён безвозвратно вместе с портфолио.
+            </p>
+            <div class="modal-footer">
+                <button class="btn-danger" @onclick="DeleteConfirmed">Удалить</button>
+                <button class="btn-sm" @onclick="() => deleteUser = null">Отмена</button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    * { box-sizing: border-box; }
+    .admin-layout { min-height: 100vh; background: #f0f4f8; font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+    /* Шапка */
+    .admin-header { background: #1a1a2e; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    .header-brand { display: flex; align-items: center; gap: 1rem; }
+    .logo { color: white; font-size: 1.1rem; font-weight: 600; }
+    .logo b { color: #4f6ef7; }
+    .badge-admin { background: #4f6ef7; color: white; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 12px; font-weight: 600; }
+    .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .admin-email { color: #9ca3af; font-size: 0.85rem; }
+
+    /* Основная область */
+    .admin-main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .admin-title { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+
+    /* Фильтры */
+    .filter-bar { display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .search-input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; }
+    .search-input:focus { border-color: #4f6ef7; }
+    .filter-select { padding: 0.6rem 1rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; background: white; cursor: pointer; }
+
+    /* Таблица */
+    .users-table-wrap { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: auto; }
+    .users-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .users-table th { padding: 0.85rem 1rem; text-align: left; font-size: 0.8rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #f3f4f6; background: #fafafa; }
+    .users-table td { padding: 0.85rem 1rem; border-bottom: 1px solid #f3f4f6; color: #374151; }
+    .users-table tr:last-child td { border-bottom: none; }
+    .row-archived td { color: #9ca3af; }
+
+    /* Бейджи */
+    .role-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+    .role-badge.admin { background: #eef2ff; color: #4f6ef7; }
+    .role-badge.user  { background: #f3f4f6; color: #6b7280; }
+    .status-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+    .status-badge.active   { background: #dcfce7; color: #15803d; }
+    .status-badge.archived { background: #fef3c7; color: #92400e; }
+
+    /* Кнопки действий */
+    .action-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .btn-xs { padding: 0.25rem 0.6rem; border-radius: 5px; border: 1px solid; font-size: 0.78rem; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+    .btn-xs:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-xs.edit    { border-color: #4f6ef7; color: #4f6ef7; background: #eef2ff; }
+    .btn-xs.archive { border-color: #d97706; color: #d97706; background: #fef3c7; }
+    .btn-xs.restore { border-color: #16a34a; color: #16a34a; background: #dcfce7; }
+    .btn-xs.danger  { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+    .empty-row { text-align: center; color: #9ca3af; padding: 2rem !important; }
+
+    /* Кнопки общие */
+    .btn-primary { background: #4f6ef7; color: white; border: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #3b57e0; }
+    .btn-danger { background: #ef4444; color: white; border: none; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid #d1d5db; background: white; color: #374151; cursor: pointer; font-size: 0.85rem; }
+    .btn-sm:hover { background: #f9fafb; }
+    .btn-sm.danger { border-color: #ef4444; color: #ef4444; }
+
+    /* Модальные окна */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal { background: white; border-radius: 16px; padding: 2rem; width: 100%; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 1rem; }
+    .modal.small { max-width: 360px; }
+    .modal-title { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+    .modal-footer { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-group label { font-size: 0.82rem; font-weight: 600; color: #6b7280; }
+    .form-input { padding: 0.6rem 0.85rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; }
+    .form-input:focus { border-color: #4f6ef7; }
+    .alert-error { background: #fef2f2; border: 1px solid #fca5a5; color: #b91c1c; border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.9rem; }
+</style>
+
+@code {
+    bool initialized = false;
+    List<User> allUsers = new();
+
+    // Фильтры
+    string searchQuery = string.Empty;
+    string filterRole   = string.Empty;
+    string filterStatus = "active";
+
+    // Создание
+    bool showCreateModal = false;
+    string createEmail    = string.Empty;
+    string createName     = string.Empty;
+    string createPassword = string.Empty;
+    string createRole     = "User";
+    string createError    = string.Empty;
+
+    // Редактирование
+    User? editUser = null;
+    string editNewPassword = string.Empty;
+    string editError = string.Empty;
+    string editFullName = string.Empty;
+    int editRoleId = 1;
+
+    // Удаление
+    User? deleteUser = null;
+
+    IEnumerable<User> FilteredUsers => allUsers
+        .Where(u => string.IsNullOrEmpty(searchQuery)
+                    || u.Email.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+                    || (u.StudentProfile?.FullName?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false))
+        .Where(u => string.IsNullOrEmpty(filterRole) || u.Role?.Code == filterRole)
+        .Where(u => filterStatus == "active"   ? !u.IsArchived :
+                    filterStatus == "archived" ?  u.IsArchived : true);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Только администратор может попасть на эту страницу
+            if (!Session.IsAdmin)
+            {
+                Navigation.NavigateTo(Session.IsLoggedIn ? "/constructor" : "/");
+                return;
+            }
+            LoadUsers();
+            initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    void LoadUsers() => allUsers = AdminService.GetAllUsers();
+
+    void Archive(int userId)
+    {
+        AdminService.ArchiveUser(userId);
+        LoadUsers();
+    }
+
+    void Restore(int userId)
+    {
+        AdminService.RestoreUser(userId);
+        LoadUsers();
+    }
+
+    void OpenEdit(User user)
+    {
+        // Создаём копию чтобы не мутировать список напрямую
+        editUser = new User
+        {
+            Id         = user.Id,
+            Email      = user.Email,
+            RoleId     = user.RoleId,
+            IsArchived = user.IsArchived
+        };
+        editFullName = user.StudentProfile?.FullName ?? string.Empty;
+        editRoleId   = user.RoleId;
+        editNewPassword = string.Empty;
+        editError = string.Empty;
+    }
+
+    void CloseEdit()
+    {
+        editUser = null;
+        editNewPassword = string.Empty;
+        editError = string.Empty;
+    }
+
+    void SaveEdit()
+    {
+        if (editUser == null) return;
+        if (string.IsNullOrWhiteSpace(editUser.Email))
+        {
+            editError = "Email не может быть пустым.";
+            return;
+        }
+        editUser.RoleId = editRoleId;
+        AdminService.UpdateUser(editUser);
+        AdminService.UpdateStudentName(editUser.Id, editFullName);
+        if (!string.IsNullOrWhiteSpace(editNewPassword))
+        {
+            if (editNewPassword.Length < 6)
+            {
+                editError = "Пароль должен быть не менее 6 символов.";
+                return;
+            }
+            AdminService.ChangePassword(editUser.Id, editNewPassword);
+        }
+        CloseEdit();
+        LoadUsers();
+    }
+
+    void ConfirmDelete(User user) => deleteUser = user;
+
+    void DeleteConfirmed()
+    {
+        if (deleteUser == null) return;
+        AdminService.DeleteUser(deleteUser.Id);
+        deleteUser = null;
+        LoadUsers();
+    }
+
+    void CreateUser()
+    {
+        createError = string.Empty;
+        if (string.IsNullOrWhiteSpace(createEmail))   { createError = "Введите email."; return; }
+        if (string.IsNullOrWhiteSpace(createPassword)) { createError = "Введите пароль."; return; }
+        if (createPassword.Length < 6) { createError = "Пароль минимум 6 символов."; return; }
+
+        AdminService.CreateUser(createEmail, createPassword, createRole,
+                                string.IsNullOrWhiteSpace(createName) ? null : createName);
+
+        showCreateModal = false;
+        createEmail = createPassword = createName = string.Empty;
+        createRole = "User";
+        LoadUsers();
+    }
+
+    void GoToConstructor() => Navigation.NavigateTo("/constructor");
+
+    void Logout()
+    {
+        Session.Logout();
+        Navigation.NavigateTo("/");
+    }
+}

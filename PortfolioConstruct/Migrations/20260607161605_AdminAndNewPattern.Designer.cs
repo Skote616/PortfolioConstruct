@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PortfolioConstruct.Models;
 
@@ -11,9 +12,11 @@ using PortfolioConstruct.Models;
 namespace PortfolioConstruct.Migrations
 {
     [DbContext(typeof(PortfolioContext))]
-    partial class PortfolioContextModelSnapshot : ModelSnapshot
+    [Migration("20260607161605_AdminAndNewPattern")]
+    partial class AdminAndNewPattern
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,9 +32,6 @@ namespace PortfolioConstruct.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BlockTypeId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Caption")
                         .HasColumnType("nvarchar(max)");
@@ -57,77 +57,15 @@ namespace PortfolioConstruct.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("BlockTypeId");
-
-                    b.HasIndex("SectionId");
-
-                    b.ToTable("Block", (string)null);
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.BlockType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Icon")
+                    b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
-                        .IsUnique();
+                    b.HasIndex(new[] { "SectionId" }, "IX_Block_SectionId");
 
-                    b.ToTable("BlockType", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Code = "text",
-                            Icon = "📝",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Code = "image",
-                            Icon = "🖼",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Code = "link",
-                            Icon = "🔗",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Code = "gallery",
-                            Icon = "🖼🖼",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Code = "document",
-                            Icon = "📎",
-                            IsActive = true
-                        });
+                    b.ToTable("Block", (string)null);
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.DesignSetting", b =>
@@ -159,7 +97,7 @@ namespace PortfolioConstruct.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PortfolioId")
+                    b.HasIndex(new[] { "PortfolioId" }, "IX_DesignSettings_PortfolioId")
                         .IsUnique();
 
                     b.ToTable("DesignSettings");
@@ -188,7 +126,7 @@ namespace PortfolioConstruct.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BlockId");
+                    b.HasIndex(new[] { "BlockId" }, "IX_GalleryImage_BlockId");
 
                     b.ToTable("GalleryImage", (string)null);
                 });
@@ -201,47 +139,19 @@ namespace PortfolioConstruct.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("About")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId")
+                    b.HasIndex(new[] { "UserId" }, "IX_Portfolios_UserId")
                         .IsUnique();
 
                     b.ToTable("Portfolios");
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.Role", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("Role", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Code = "User"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Code = "Admin"
-                        });
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.Section", b =>
@@ -267,43 +177,9 @@ namespace PortfolioConstruct.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PortfolioId");
+                    b.HasIndex(new[] { "PortfolioId" }, "IX_Section_PortfolioId");
 
                     b.ToTable("Section", (string)null);
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.StudentProfile", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AvatarPath")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FullName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("GroupName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Specialty")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("StudentProfile", (string)null);
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.User", b =>
@@ -319,43 +195,37 @@ namespace PortfolioConstruct.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FullName")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsArchived")
                         .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
-                    b.Property<int>("RoleId")
-                        .HasColumnType("int");
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id")
                         .HasName("PK_Users");
-
-                    b.HasIndex("RoleId");
 
                     b.ToTable("User", (string)null);
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.Block", b =>
                 {
-                    b.HasOne("PortfolioConstruct.Models.BlockType", "BlockType")
-                        .WithMany("Blocks")
-                        .HasForeignKey("BlockTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("PortfolioConstruct.Models.Section", "Section")
                         .WithMany("Blocks")
                         .HasForeignKey("SectionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("BlockType");
 
                     b.Navigation("Section");
                 });
@@ -404,36 +274,9 @@ namespace PortfolioConstruct.Migrations
                     b.Navigation("Portfolio");
                 });
 
-            modelBuilder.Entity("PortfolioConstruct.Models.StudentProfile", b =>
-                {
-                    b.HasOne("PortfolioConstruct.Models.User", "User")
-                        .WithOne("StudentProfile")
-                        .HasForeignKey("PortfolioConstruct.Models.StudentProfile", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.User", b =>
-                {
-                    b.HasOne("PortfolioConstruct.Models.Role", "Role")
-                        .WithMany("Users")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Role");
-                });
-
             modelBuilder.Entity("PortfolioConstruct.Models.Block", b =>
                 {
                     b.Navigation("GalleryImages");
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.BlockType", b =>
-                {
-                    b.Navigation("Blocks");
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.Portfolio", b =>
@@ -441,11 +284,6 @@ namespace PortfolioConstruct.Migrations
                     b.Navigation("DesignSetting");
 
                     b.Navigation("Sections");
-                });
-
-            modelBuilder.Entity("PortfolioConstruct.Models.Role", b =>
-                {
-                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("PortfolioConstruct.Models.Section", b =>
@@ -456,8 +294,6 @@ namespace PortfolioConstruct.Migrations
             modelBuilder.Entity("PortfolioConstruct.Models.User", b =>
                 {
                     b.Navigation("Portfolio");
-
-                    b.Navigation("StudentProfile");
                 });
 #pragma warning restore 612, 618
         }

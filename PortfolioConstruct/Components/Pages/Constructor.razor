@@ -1,9 +1,9 @@
 @page "/constructor"
 @inject NavigationManager Navigation
-@inject DBService DbService
+@inject IPortfolioService PortfolioService
 @inject SessionService Session
 @using PortfolioConstruct.Models
-@using PortfolioConstruct.Service
+@using PortfolioConstruct.Services
 @using Microsoft.AspNetCore.Components.Forms
 @rendermode InteractiveServer
 
@@ -52,7 +52,12 @@ else
         </div>
 
         <div class="sidebar-footer">
+            <button class="btn-sm" @onclick="GoToProfile">👤 Профиль</button>
             <button class="btn-sm" @onclick="GoToView">👁 Просмотр</button>
+            @if (Session.IsAdmin)
+            {
+                <button class="btn-sm" @onclick="GoToAdmin">⚙ Админ</button>
+            }
             <button class="btn-sm danger" @onclick="Logout">Выйти</button>
         </div>
 
@@ -340,7 +345,7 @@ else
         if (firstRender)
         {
             if (!Session.IsLoggedIn) { Navigation.NavigateTo("/"); return; }
-            portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+            portfolio = PortfolioService.GetOrCreatePortfolio(Session.CurrentUserId);
             design = portfolio.DesignSetting;
             activeSection = portfolio.Sections.FirstOrDefault();
             initialized = true;
@@ -353,7 +358,7 @@ else
     void ConfirmAddSection()
     {
         if (string.IsNullOrWhiteSpace(newSectionTitle) || portfolio == null) return;
-        DbService.AddCustomSection(portfolio.Id, newSectionTitle);
+        PortfolioService.AddCustomSection(portfolio.Id, newSectionTitle);
         Reload(selectLast: true);
         newSectionTitle = string.Empty;
         addingSectionMode = false;
@@ -362,22 +367,22 @@ else
     void DeleteSection(Section sec)
     {
         if (!sec.IsCustom) return;
-        DbService.DeleteSection(sec.Id);
+        PortfolioService.DeleteSection(sec.Id);
         Reload(selectLast: false);
     }
 
     void AddBlock(string type)
     {
         if (activeSection == null) return;
-        DbService.AddBlock(activeSection.Id, type, string.Empty);
+        PortfolioService.AddBlock(activeSection.Id, type);
         ReloadSection();
     }
 
-    void SaveBlock(Block block) => DbService.UpdateBlock(block);
+    void SaveBlock(Block block) => PortfolioService.UpdateBlock(block);
 
     void DeleteBlock(Block block)
     {
-        DbService.DeleteBlock(block.Id);
+        PortfolioService.DeleteBlock(block.Id);
         ReloadSection();
     }
 
@@ -391,9 +396,9 @@ else
     {
         uploadingBlockId = block.Id;
         StateHasChanged();
-        var path = await DbService.SaveImageAsync(e.File);
+        var path = await PortfolioService.SaveImageAsync(e.File);
         block.Content = path;
-        DbService.UpdateBlock(block);
+        PortfolioService.UpdateBlock(block);
         uploadingBlockId = null;
         ReloadSection();
     }
@@ -402,9 +407,9 @@ else
     {
         uploadingBlockId = block.Id;
         StateHasChanged();
-        var result = await DbService.SaveDocumentAsync(e.File);
+        var result = await PortfolioService.SaveDocumentAsync(e.File);
         block.Content = result;
-        DbService.UpdateBlock(block);
+        PortfolioService.UpdateBlock(block);
         uploadingBlockId = null;
         ReloadSection();
     }
@@ -413,22 +418,17 @@ else
     {
         uploadingBlockId = block.Id;
         StateHasChanged();
-        var sortOrder = block.GalleryImages.Any() ? block.GalleryImages.Max(g => g.SortOrder) + 1 : 0;
-        foreach (var file in e.GetMultipleFiles(20))
-        {
-            var path = await DbService.SaveImageAsync(file);
-            DbService.AddGalleryImage(block.Id, path, null, sortOrder++);
-        }
+        await PortfolioService.AddGalleryImagesAsync(block.Id, e.GetMultipleFiles(20));
         uploadingBlockId = null;
         ReloadSection();
     }
 
     void SaveGalleryCaption(int galleryImageId, string? caption)
-        => DbService.UpdateGalleryImageCaption(galleryImageId, caption);
+        => PortfolioService.UpdateGalleryImageCaption(galleryImageId, caption);
 
     void DeleteGalleryImage(int galleryImageId, Block block)
     {
-        DbService.DeleteGalleryImage(galleryImageId);
+        PortfolioService.DeleteGalleryImage(galleryImageId);
         ReloadSection();
     }
 
@@ -443,14 +443,16 @@ else
         StateHasChanged();
     }
 
-    void SaveDesign() { if (design != null) DbService.UpdateDesign(design); }
-    void GoToView()   => Navigation.NavigateTo("/view");
+    void SaveDesign() { if (design != null) PortfolioService.UpdateDesign(design); }
+    void GoToProfile() => Navigation.NavigateTo("/profile");
+    void GoToAdmin()   => Navigation.NavigateTo("/admin");
+    void GoToView()    => Navigation.NavigateTo("/view");
     void Logout()     { Session.Logout(); Navigation.NavigateTo("/"); }
 
     void Reload(bool selectLast)
     {
         var prevId = activeSection?.Id;
-        portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+        portfolio = PortfolioService.GetOrCreatePortfolio(Session.CurrentUserId);
         design = portfolio.DesignSetting;
         activeSection = selectLast
             ? portfolio.Sections.LastOrDefault()
@@ -460,7 +462,7 @@ else
     void ReloadSection()
     {
         var prevId = activeSection?.Id;
-        portfolio = DbService.GetOrCreatePortfolio(Session.CurrentUserId);
+        portfolio = PortfolioService.GetOrCreatePortfolio(Session.CurrentUserId);
         design = portfolio.DesignSetting;
         activeSection = portfolio.Sections.FirstOrDefault(s => s.Id == prevId);
     }
